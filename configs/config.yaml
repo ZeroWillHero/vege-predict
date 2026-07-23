@@ -1,0 +1,41 @@
+vegetables:
+  - carrot
+  - brinjal
+  - pumpkin
+  - cabbage
+  - snake_gourd
+  - leeks
+
+data:
+  raw_prices_dir: data/raw/vegetable_prices
+  raw_weather_dir: data/raw/weather
+  raw_fuel_dir: data/raw/fuel
+  processed_dir: data/processed
+
+forecasting:
+  target_column: price
+  date_column: date
+  test_size: 0.2
+  horizon: 30
+
+models:
+  sarimax:
+    order: [1, 1, 1]
+    seasonal_order: [1, 1, 1, 12]
+    exog_features: [rainfall, temperature, fuel_price]
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+  catboost:
+    iterations: 1000
+    depth: 6
+    learning_rate: 0.05
+  hybrid_xgboost_sarimax:
+    residual_model: xgboost
+  hybrid_catboost_sarimax:
+    residual_model: catboost
+
+paths:
+  trained_models_dir: trained_models
+  results_dir: results
