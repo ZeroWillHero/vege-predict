@@ -6,23 +6,67 @@ vegetables:
   - snake_gourd
   - leeks
 
+# Raw vegetable_prices.csv uses different names/casing than the vegetables list above.
+vegetable_name_map:
+  carrot: CARROT
+  brinjal: BRINJALS
+  pumpkin: PUMPKIN
+  cabbage: CABBAGE
+  snake_gourd: SNAKE GOURD
+  leeks: LEEKS
+
+# Weather is collected per-district (scripts/fetch_weather_openmeteo.py); each vegetable
+# is mapped to its representative growing district (up-country vs low-country), per
+# Weerasekara et al. (2026) and Ranaweera et al. (2023) in research-papers/drafts/thesis/02_literature_review.md.
+weather_district_map:
+  carrot: Nuwara Eliya
+  leeks: Nuwara Eliya
+  cabbage: Nuwara Eliya
+  brinjal: Matale
+  pumpkin: Anuradhapura
+  snake_gourd: Kurunegala
+
 data:
   raw_prices_dir: data/raw/vegetable_prices
   raw_weather_dir: data/raw/weather
   raw_fuel_dir: data/raw/fuel
+  raw_satellite_dir: data/raw/satellite
+  raw_iot_dir: data/raw/iot
+  raw_behavioral_dir: data/raw/behavioral
   processed_dir: data/processed
+  # Aligned overlap across price/fuel/weather sources (fuel data starts 2015-01-05,
+  # price data ends 2025-12-22 as of this run).
+  aligned_start_date: "2015-01-05"
+  aligned_end_date: "2025-12-22"
 
 forecasting:
-  target_column: price
+  target_column: retail_price
   date_column: date
-  test_size: 0.2
-  horizon: 30
+  horizon_weeks: 1  # one-step-ahead (next week) forecast; multi-week-ahead is future work
+  holdout_weeks: 52  # final untouched test set, most recent year
+  cv_splits: 5        # walk-forward splits over the remaining training data
 
 models:
   sarimax:
     order: [1, 1, 1]
-    seasonal_order: [1, 1, 1, 12]
-    exog_features: [rainfall, temperature, fuel_price]
+    # s=52 (annual seasonality for weekly data), matching Champika & Mugera's
+    # SARIMA(3,1,2)(0,0,2)[52] for Sri Lankan carrot prices (cited in the lit review).
+    # D=0 (no seasonal differencing): D=1 at s=52 was empirically unstable (forecasts
+    # diverged to implausible values) with only ~10 seasonal cycles of training data.
+    seasonal_order: [1, 0, 1, 52]
+    exog_features: [average_rainfall, average_temperature, diesel_price]
+  lstm:
+    lookback: 30
+    units: 64
+    layers: 2
+    dropout: 0.2
+    epochs: 100
+    batch_size: 32
+    learning_rate: 0.001
+  random_forest:
+    n_estimators: 500
+    max_depth: 10
+    min_samples_leaf: 2
   xgboost:
     n_estimators: 500
     max_depth: 6

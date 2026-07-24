@@ -2,7 +2,6 @@ numpy
 pandas
 scikit-learn
 statsmodels
-pmdarima
 xgboost
 catboost
 optuna
@@ -11,3 +10,5 @@ seaborn
 pyyaml
 jupyter
 joblib
+tensorflow
+ipykernel

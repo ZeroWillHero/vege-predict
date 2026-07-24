@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 .DS_Store
+catboost_info/
 
 data/raw/*
 data/processed/*
@@ -18,6 +19,7 @@ trained_models/**/*
 results/figures/*
 results/tables/*
 results/metrics/*
+results/explainability/*
 !results/**/.gitkeep
 
 research-papers/references/*.pdf

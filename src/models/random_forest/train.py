@@ -1,26 +1,26 @@
-"""Train a CatBoost regressor per vegetable using lag/rolling/calendar features."""
+"""Train a Random Forest regressor per vegetable using lag/rolling/calendar features."""
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
-from catboost import CatBoostRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 from src.models.common import parse_vegetable_arg, run_for_vegetables
 from src.utils.io import load_config
 
-MODEL_FAMILY = "catboost"
+MODEL_FAMILY = "random_forest"
 
 
 def _make_model(config):
-    params = config["models"]["catboost"]
-    return CatBoostRegressor(
-        iterations=params["iterations"],
-        depth=params["depth"],
-        learning_rate=params["learning_rate"],
-        random_seed=42,
-        verbose=False,
+    params = config["models"]["random_forest"]
+    return RandomForestRegressor(
+        n_estimators=params["n_estimators"],
+        max_depth=params["max_depth"],
+        min_samples_leaf=params["min_samples_leaf"],
+        random_state=42,
+        n_jobs=-1,
     )
 
 
