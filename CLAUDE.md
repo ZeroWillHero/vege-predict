@@ -30,7 +30,7 @@ Resolved decisions (were open questions earlier; now settled and reflected in co
 - **Forecast target**: `retail_price` (not wholesale) — `forecasting.target_column` in config.
 - **Weather↔vegetable mapping**: each vegetable mapped to one representative growing district (`weather_district_map` in config) rather than a national average — see the table in the plan/commit history if the rationale needs revisiting.
 - **LSTM framework**: TensorFlow/Keras (installed in `.venv`).
-- **Fuel feature**: `diesel_price`, not `petrol92_price` (transport-cost driver, matches the literature).
+- **Fuel feature**: `diesel_price` only — `petrol92_price` was removed from `data/raw/fuel/fuel_data_weekly.csv` entirely (not just unused in code), since diesel is the transport-cost driver for produce trucks and petrol has no link to the vegetable supply chain (matches the literature).
 - **Vegetable name mismatch**: raw CSV uses `BRINJALS`/`SNAKE GOURD`/etc.; `vegetable_name_map` in config bridges this to the lowercase config names.
 - **Data alignment**: usable range across all 3 raw sources is 2015-01-05 to 2025-12-22 (fuel data is the binding start constraint, price data the binding end constraint) — `aligned_start_date`/`aligned_end_date` in config.
 
@@ -38,20 +38,30 @@ Known technical gotchas (if touching `src/models/sarimax/`):
 - `simple_differencing=True` combined with `exog` breaks statsmodels' out-of-sample forecasting — it was tried for speed and produced forecasts that diverged to nonsensical values (confirmed empirically). Do not re-enable it without re-verifying holdout predictions stay in a sane range.
 - Never pickle a fitted `SARIMAXResultsWrapper` directly — with `seasonal_order` period 52, it balloons to ~320MB per artifact (the Kalman filter's full state/covariance history). Use `SarimaxArtifact` (`src/models/sarimax/train.py`) instead: it stores just `params` + a small history frame and reconstructs via `.filter(params)`, at ~20KB with byte-identical forecasts. `HybridSarimaxResidualModel` (`src/models/hybrid_xgboost_sarimax/train.py`) already builds on this — don't regress it back to storing the raw results object.
 
+## Model selection criteria
+
+Two different criteria are used deliberately, for two different questions:
+
+- **Best model family per vegetable** (the headline result): **holdout RMSE**. AIC is only well-defined for likelihood-based models like SARIMAX — there's no standard AIC for Random Forest, XGBoost, CatBoost, or an LSTM, so it can't be used to compare across these heterogeneous families. Out-of-sample error is the standard approach for this (as in the M-competitions).
+- **SARIMAX's own (p,d,q) order**: **AIC**, via `scripts/select_sarimax_order.py` — standard Box-Jenkins order identification. Searches (p,1,q) for p,q ∈ {0,1,2} per vegetable (d=1 and seasonal_order=(1,0,1,52) held fixed, both already established as necessary/stable — see gotchas above), fits each candidate on the full series, and picks the AIC-minimizer. Results in `results/tables/sarimax_order_selection.csv`; the selected orders are wired into `configs/config.yaml` as `models.sarimax.order_by_vegetable`, which every SARIMAX-based model (`sarimax`, both hybrids) now reads per vegetable via `get_order_for_vegetable()`.
+- **Important**: the AIC-selected order does not uniformly beat the arbitrary (1,1,1) baseline it replaced on holdout RMSE — it helped substantially for pumpkin (RMSE 110.8→57.5) and leeks, but slightly hurt carrot, brinjal, and snake_gourd. This is expected, not a bug: AIC measures in-sample fit quality, not out-of-sample generalization. It's still the methodologically correct way to *choose the order* — it just was never going to guarantee the best holdout score, which is exactly why the headline "best model" decision uses holdout RMSE instead.
+
 Environment: project uses an isolated `.venv` (not system/Anaconda Python) — see Setup below. Verified working on Apple Silicon (M4).
 
-**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`):
+**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order):
 
 | vegetable | catboost | random_forest | xgboost | lstm | sarimax | hybrid_xgb+sarimax | hybrid_cb+sarimax |
 |---|---|---|---|---|---|---|---|
-| carrot | 114.4 | **133.1** | 184.2 | 163.7 | 314.1 | 268.6 | 296.7 |
-| brinjal | 96.9 | **82.3** | 106.6 | 137.0 | 115.2 | 139.5 | 133.7 |
-| pumpkin | 26.8 | **22.8** | 23.3 | 65.6 | 110.8 | 111.3 | 110.6 |
-| cabbage | 62.2 | **42.2** | 50.6 | 99.0 | 97.4 | 109.9 | 109.5 |
-| snake_gourd | **71.5** | 62.5 | 72.7 | 87.1 | 95.4 | 108.2 | 105.8 |
-| leeks | **46.0** | 47.7 | 49.7 | 66.2 | 75.1 | 74.2 | 74.8 |
+| carrot | 114.4 | **133.1** | 184.2 | 182.9 | 315.8 | 321.2 | 289.0 |
+| brinjal | 96.9 | **82.3** | 106.6 | 128.5 | 144.1 | 163.5 | 152.8 |
+| pumpkin | 26.8 | **22.8** | 23.3 | 64.0 | 57.5 | 59.3 | 58.7 |
+| cabbage | 62.2 | **42.2** | 50.6 | 104.0 | 98.8 | 115.7 | 113.9 |
+| snake_gourd | **71.5** | 62.5 | 72.7 | 94.9 | 108.3 | 123.1 | 120.1 |
+| leeks | **46.0** | 47.7 | 49.7 | 58.7 | 71.5 | 72.7 | 72.5 |
 
-Random Forest and CatBoost dominate every vegetable; SARIMAX and both SARIMAX-hybrids are consistently the worst performers. This is a genuine finding, not a bug: SARIMAX's own fit is poor on the recent (volatile) holdout year (all its R² values are negative), and because the hybrids are additive on top of that poor baseline, they inherit and compound its error rather than correcting it — the residual-correction framing only helps when the underlying statistical model is reasonably good. Worth a discussion-section paragraph in the thesis; don't read it as "the pipeline is broken."
+Random Forest and CatBoost dominate every vegetable; SARIMAX and both SARIMAX-hybrids remain the worst performers even with AIC-selected orders. This is a genuine finding, not a bug: SARIMAX's own fit is poor on the recent (volatile) holdout year (all its R² values are still negative except leeks, ~0.01), and because the hybrids are additive on top of that baseline, they inherit its error rather than correcting it — the residual-correction framing only helps when the underlying statistical model is reasonably good, which is why pumpkin (where AIC-tuning helped SARIMAX most) is also where the hybrids improved most. Worth a discussion-section paragraph in the thesis; don't read it as "the pipeline is broken."
+
+**Forecast prediction rows** (`results/metrics/holdout_predictions.csv`, 2,184 = 6 vegetables × 7 models × 52 weeks) and **AIC order-search rows** (`results/tables/sarimax_order_selection.csv`, 54 = 6 vegetables × 9 candidate orders) should be regenerated together whenever the SARIMAX order changes — run `scripts/select_sarimax_order.py` first, update `order_by_vegetable` if orders shift, then `scripts/train_all.py`.
 
 Still open / deferred to a later phase: LLM provider for the advisory module; how satellite NDVI / IoT / behavioral survey data will actually be sourced (GEE auth, IoT data format, survey instrument); SHAP explainability implementation; prototype UI framework choice.
 
@@ -114,6 +124,8 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 
 **Evaluation:** `src/evaluation/metrics.py` is the single source of truth for MAE/RMSE/MAPE — all training scripts and notebooks should import from there rather than reimplementing metrics, so comparisons across model families stay apples-to-apples.
 
+**Forecast verification:** `common.run_training` returns both the metrics dict and the holdout-period `(date, actual, predicted)` series; `scripts/train_all.py` concatenates the latter into `results/metrics/holdout_predictions.csv` (2,184 rows = 6 vegetables × 7 models × 52 holdout weeks). `notebooks/03_model_results.ipynb` plots these as forecast-vs-actual charts (and residuals), saved to `results/figures/forecast_vs_actual_*.png` — don't rely on RMSE/R² tables alone to sanity-check a model; look at the actual curve.
+
 ## Folder layout
 
 - `data/raw/` — untouched source data (vegetable_prices, weather, fuel, satellite, iot, behavioral), one subfolder each
@@ -132,7 +144,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `scripts/fetch_weather_openmeteo.py` — repopulates `data/raw/weather/weather.csv` from Open-Meteo
 - `notebooks/` — exploratory analysis; production logic belongs in `src/`, not notebooks. `01_data_exploration.ipynb`, `02_feature_engineering.ipynb`, `03_model_results.ipynb` (the last needs `results/metrics/all_results.csv` from `scripts/train_all.py` to exist first)
 - `research-papers/references/` — literature (PDFs, papers) informing the methodology; gitignored (not checked in), fetch again from `## Literature status` below if missing
-- `research-papers/drafts/thesis/` — the thesis chapters (`01_introduction.md`, `02_literature_review.md`, ...)
+- `research-papers/drafts/thesis/` — the thesis chapters (`01_introduction.md`, `02_literature_review.md`, `03_methodology.md`, ...)
 
 ## Documentation stays in sync with research
 

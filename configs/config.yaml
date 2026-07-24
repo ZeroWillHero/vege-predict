@@ -48,13 +48,24 @@ forecasting:
 
 models:
   sarimax:
-    order: [1, 1, 1]
+    order: [1, 1, 1]  # fallback default; per-vegetable AIC-selected orders below take precedence
     # s=52 (annual seasonality for weekly data), matching Champika & Mugera's
     # SARIMA(3,1,2)(0,0,2)[52] for Sri Lankan carrot prices (cited in the lit review).
     # D=0 (no seasonal differencing): D=1 at s=52 was empirically unstable (forecasts
     # diverged to implausible values) with only ~10 seasonal cycles of training data.
     seasonal_order: [1, 0, 1, 52]
     exog_features: [average_rainfall, average_temperature, diesel_price]
+    # (p,d,q) selected by AIC-minimizing grid search (d=1 fixed, seasonal_order fixed
+    # as above) via scripts/select_sarimax_order.py; see results/tables/sarimax_order_selection.csv
+    # for the full candidate grid and AIC/BIC per vegetable. Re-run that script and update
+    # this block if the underlying price data changes materially.
+    order_by_vegetable:
+      carrot: [0, 1, 2]
+      brinjal: [2, 1, 2]
+      pumpkin: [2, 1, 2]
+      cabbage: [2, 1, 2]
+      snake_gourd: [2, 1, 2]
+      leeks: [1, 1, 2]
   lstm:
     lookback: 30
     units: 64

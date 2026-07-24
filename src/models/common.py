@@ -22,11 +22,14 @@ def load_features(vegetable: str, config: dict):
     return feat, feature_cols
 
 
-def run_training(vegetable: str, model_family: str, config: dict, fit_predict, fit_final, keras: bool = False) -> dict:
+def run_training(vegetable: str, model_family: str, config: dict, fit_predict, fit_final, keras: bool = False):
     """Walk-forward CV + final holdout evaluation + production refit, for any model family.
 
     fit_predict(train_df, test_df, feature_cols) -> array of predictions aligned to test_df.
     fit_final(full_df, feature_cols, vegetable) -> fitted model object, saved as the production artifact.
+
+    Returns (result, predictions_df): result is the metrics dict; predictions_df holds the
+    holdout-period date/actual/predicted series (used for forecast-vs-actual plots).
     """
     feat, feature_cols = load_features(vegetable, config)
     n = len(feat)
@@ -46,6 +49,16 @@ def run_training(vegetable: str, model_family: str, config: dict, fit_predict, f
     holdout_preds = fit_predict(holdout_train_df, holdout_test_df, feature_cols)
     holdout_metrics = evaluate(holdout_test_df["target"].values, holdout_preds)
 
+    predictions_df = pd.DataFrame(
+        {
+            "vegetable": vegetable,
+            "model": model_family,
+            "date": holdout_test_df["date"].values,
+            "actual": holdout_test_df["target"].values,
+            "predicted": holdout_preds,
+        }
+    )
+
     final_model = fit_final(feat, feature_cols, vegetable)
     save_model(final_model, model_family, vegetable, config, keras=keras)
 
@@ -55,8 +68,13 @@ def run_training(vegetable: str, model_family: str, config: dict, fit_predict, f
         f"{vegetable}/{model_family}: holdout RMSE={holdout_metrics['rmse']:.2f} "
         f"MAPE={holdout_metrics['mape']:.2f}% R2={holdout_metrics['r2']:.3f}"
     )
-    return result
+    return result, predictions_df
 
 
-def run_for_vegetables(vegetables, model_family: str, config: dict, fit_predict, fit_final, keras: bool = False) -> list:
-    return [run_training(v, model_family, config, fit_predict, fit_final, keras=keras) for v in vegetables]
+def run_for_vegetables(vegetables, model_family: str, config: dict, fit_predict, fit_final, keras: bool = False):
+    results, predictions = [], []
+    for v in vegetables:
+        result, preds = run_training(v, model_family, config, fit_predict, fit_final, keras=keras)
+        results.append(result)
+        predictions.append(preds)
+    return results, predictions

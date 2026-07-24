@@ -37,12 +37,14 @@ MODEL_TRAINERS = {
 def main():
     config = load_config()
     all_results = []
+    all_predictions = []
 
     for model_family, trainer in MODEL_TRAINERS.items():
         print(f"\n=== {model_family} ===")
         t0 = time.time()
-        results = trainer(config)
+        results, predictions = trainer(config)
         all_results.extend(results)
+        all_predictions.extend(predictions)
         print(f"{model_family} done in {time.time() - t0:.1f}s")
 
     results_df = pd.DataFrame(all_results)
@@ -50,6 +52,11 @@ def main():
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(metrics_path, index=False)
     print(f"\nSaved {len(results_df)} rows to {metrics_path}")
+
+    predictions_df = pd.concat(all_predictions, ignore_index=True)
+    predictions_path = PROJECT_ROOT / "results" / "metrics" / "holdout_predictions.csv"
+    predictions_df.to_csv(predictions_path, index=False)
+    print(f"Saved {len(predictions_df)} holdout prediction rows to {predictions_path}")
 
     comparison = results_df.pivot(index="vegetable", columns="model", values="rmse")
     tables_path = PROJECT_ROOT / "results" / "tables" / "model_comparison.csv"
