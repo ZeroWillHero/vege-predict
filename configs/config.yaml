@@ -34,10 +34,16 @@ data:
   raw_iot_dir: data/raw/iot
   raw_behavioral_dir: data/raw/behavioral
   processed_dir: data/processed
-  # Aligned overlap across price/fuel/weather sources (fuel data starts 2015-01-05,
-  # price data ends 2025-12-22 as of this run).
+  # Aligned overlap across price/fuel/weather sources (fuel data starts 2015-01-05).
+  # End date is price-bound: fuel now extends to 2026-07-20 (cpc_fuel.py) and
+  # weather to 2026-07-20 too, but vegetable_prices.csv's HARTI backfill only
+  # reaches 2026-06-22, with an internal gap 2025-12-29..2026-03-09 (HARTI didn't
+  # publish weeks 1-10/12/15/21 of 2026 — see CLAUDE.md's auto-retrain pipeline
+  # notes). build_dataset.py's inner join naturally skips gap weeks; no special
+  # handling needed. Re-check all three sources' max dates before bumping this
+  # further; a stale value here silently discards new data.
   aligned_start_date: "2015-01-05"
-  aligned_end_date: "2025-12-22"
+  aligned_end_date: "2026-06-22"
 
 forecasting:
   target_column: retail_price

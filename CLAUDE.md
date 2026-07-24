@@ -48,22 +48,31 @@ Two different criteria are used deliberately, for two different questions:
 
 Environment: project uses an isolated `.venv` (not system/Anaconda Python) — see Setup below. Verified working on Apple Silicon (M4).
 
-**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order):
+**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order; holdout is always the most recent 52 weeks of whatever data exists, so it shifted forward to ~Jun 2025-Jun 2026 after the HARTI/CPC data update — not directly comparable to earlier snapshots of this table):
 
 | vegetable | catboost | random_forest | xgboost | lstm | sarimax | hybrid_xgb+sarimax | hybrid_cb+sarimax |
 |---|---|---|---|---|---|---|---|
-| carrot | 114.4 | **133.1** | 184.2 | 182.9 | 315.8 | 321.2 | 289.0 |
-| brinjal | 96.9 | **82.3** | 106.6 | 128.5 | 144.1 | 163.5 | 152.8 |
-| pumpkin | 26.8 | **22.8** | 23.3 | 64.0 | 57.5 | 59.3 | 58.7 |
-| cabbage | 62.2 | **42.2** | 50.6 | 104.0 | 98.8 | 115.7 | 113.9 |
-| snake_gourd | **71.5** | 62.5 | 72.7 | 94.9 | 108.3 | 123.1 | 120.1 |
-| leeks | **46.0** | 47.7 | 49.7 | 58.7 | 71.5 | 72.7 | 72.5 |
+| carrot | 112.7 | **100.9** | 108.2 | 166.8 | 245.7 | 254.6 | 243.9 |
+| brinjal | 98.0 | **90.7** | 100.5 | 138.0 | 124.2 | 128.3 | 131.5 |
+| pumpkin | 26.8 | **22.8** | 23.3 | 63.4 | 57.5 | 59.3 | 58.7 |
+| cabbage | 62.0 | **48.2** | 49.9 | 126.7 | 110.8 | 116.8 | 115.1 |
+| snake_gourd | 71.5 | **62.5** | 72.7 | 96.2 | 108.3 | 123.1 | 120.1 |
+| leeks | **48.5** | 50.3 | 51.8 | 69.5 | 95.7 | 98.7 | 95.4 |
 
-Random Forest and CatBoost dominate every vegetable; SARIMAX and both SARIMAX-hybrids remain the worst performers even with AIC-selected orders. This is a genuine finding, not a bug: SARIMAX's own fit is poor on the recent (volatile) holdout year (all its R² values are still negative except leeks, ~0.01), and because the hybrids are additive on top of that baseline, they inherit its error rather than correcting it — the residual-correction framing only helps when the underlying statistical model is reasonably good, which is why pumpkin (where AIC-tuning helped SARIMAX most) is also where the hybrids improved most. Worth a discussion-section paragraph in the thesis; don't read it as "the pipeline is broken."
+Random Forest now wins 5/6 vegetables (was more mixed with CatBoost before the data update); CatBoost still wins leeks narrowly. SARIMAX and both SARIMAX-hybrids remain the worst performers on every vegetable even with AIC-selected orders — still a genuine finding, not a bug: SARIMAX's own fit is poor on the (still volatile) holdout year, all its R² values are negative, and the hybrids inherit that error rather than correcting it. Don't read the model ranking numbers as fixed — they move with the holdout window, which moves with the data; re-run `scripts/train_all.py` after any data update and expect the table to shift.
 
 **Forecast prediction rows** (`results/metrics/holdout_predictions.csv`, 2,184 = 6 vegetables × 7 models × 52 weeks) and **AIC order-search rows** (`results/tables/sarimax_order_selection.csv`, 54 = 6 vegetables × 9 candidate orders) should be regenerated together whenever the SARIMAX order changes — run `scripts/select_sarimax_order.py` first, update `order_by_vegetable` if orders shift, then `scripts/train_all.py`.
 
 Still open / deferred to a later phase: LLM provider for the advisory module; how satellite NDVI / IoT / behavioral survey data will actually be sourced (GEE auth, IoT data format, survey instrument); SHAP explainability implementation; prototype UI framework choice.
+
+## Application database
+
+For the `app/` prototype (still deferred, but the database is provisioned ahead of it): a local Docker Postgres instance (container name `postgres`, image `postgres:15.17-trixie`, already running on this Mac Mini — not something this project's tooling starts) hosts a `vegepredict` database, created but with **no schema yet** — this is infrastructure provisioning only, not an ORM/schema design decision.
+
+- Host: `localhost:5432`
+- Database: `vegepredict`
+- User: `postgres` / Password: `pg123` (local dev only — do not reuse these credentials anywhere non-local)
+- Connect via `docker exec postgres psql -U postgres -d vegepredict`, or any Postgres client at the above host/port
 
 ## Setup
 
@@ -156,5 +165,7 @@ This is a research project, not just a codebase — the docs are part of the del
 ## Literature status
 
 Sourced and read (in `research-papers/references/`, cited in `02_literature_review.md`): Madubhashini (2021/2023) — Sri Lanka, first SL-specific ML study; Ranaweera, Rathnayake & Ananda (2023) — Sri Lanka, beans/brinjal/carrot/pumpkin, RF best, same 4 exogenous features (rainfall, temperature, fuel price, production) as this project's config; Ruhunuge et al. (2024) — Sri Lanka, carrot-specific VAR climate causality; Weerasekara et al. (2026) — Sri Lanka, most advanced prior work (multi-market/season/regime XGBoost+LightGBM); Paul et al. (2022) — brinjal, India; Zhao et al. (2025) — TCN-XGBoost hybrid; Patil et al. (2023) — HySALS hybrid SARIMA-LSTM; Mayank, Shelke & Roy (2025); Shree Sanjay & Janarthanan (2025).
+
+**MLOps / automated retraining** (Section 2.9, sourced for the `feature/auto-train-MLIOPs` application-side work): Garg et al. (2022) — CI/CD/CT/CM MLOps lifecycle; Meisenbacher et al. (2022) — automated forecasting pipeline review, most cover only 2-3 of 5 stages; Pham et al. (2024) — data vs. concept drift, semi-supervised detection; Katalay, Dimandja & Masakuna (2025) — multi-criteria statistical drift-triggered retraining (PSI, KL divergence); Jain et al. (2020) — crop price context-based retraining + data-quality monitoring (IBM, India); Zelingher (2025) — AGRICAF, explainable ML + econometrics for farmer-accessible commodity forecasts. Key takeaway used in the auto-train plan: tree-based models (RF/XGBoost/CatBoost) have no incremental-learning mode and need full refits; SARIMAX refitting is the computational bottleneck (confirmed empirically in this project); given this project's scale (single machine, weekly data, ~10-15min full retrain), a scheduled retrain + validation gate is the right-sized design, not full drift-detection infrastructure.
 
 **Not yet sourced** — needed before objectives 3–4 can be written up: explainable AI (SHAP) applied to price/agricultural forecasting; LLM-based farmer advisory systems. Do not write those literature subsections from memory — search and read first.
