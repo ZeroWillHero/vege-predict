@@ -5,6 +5,8 @@ venv/
 .ipynb_checkpoints/
 .DS_Store
 catboost_info/
+.env
+.pytest_cache/
 
 data/raw/*
 data/processed/*

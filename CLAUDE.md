@@ -18,13 +18,13 @@ Target vegetables: **carrot, brinjal, pumpkin, cabbage, snake gourd, leeks**.
 **Beyond forecasting**, the proposal's remaining objectives:
 - **Explainability** (`src/explainability/`) — SHAP feature attribution across models, so forecasts are transparent to farmers/traders, not a black box
 - **Advisory** (`src/advisory/`) — an LLM turns a forecast + its SHAP explanation into a farmer-friendly natural-language recommendation
-- **Prototype** (`app/`) — a web/mobile interface surfacing forecasts, SHAP visualizations, and LLM advisory messages
+- **Prototype** (`app/`) — a web/mobile interface surfacing forecasts, SHAP visualizations, and LLM advisory messages. Its backend (`app/backend/`) is built: a FastAPI + Postgres + Redis API serving pre-computed forecasts, model comparisons, and historical prices — see `## Backend API` below. The frontend itself is still deferred.
 
 Evaluation is via time-series cross-validation (walk-forward, `src.evaluation.metrics.time_series_splits`) plus a final untouched holdout, comparing models on MAE, RMSE, MAPE, and R².
 
 ## Project status
 
-**Phase: forecasting models — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, and the prototype UI are still deferred (scoped out of this phase deliberately, not forgotten).
+**Phase: forecasting models — implemented and runnable end-to-end. Backend API (`app/backend/`) — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, the auto-retrain pipeline, and the prototype frontend UI are still deferred (scoped out of this phase deliberately, not forgotten).
 
 Resolved decisions (were open questions earlier; now settled and reflected in code/config):
 - **Forecast target**: `retail_price` (not wholesale) — `forecasting.target_column` in config.
@@ -65,14 +65,39 @@ Random Forest now wins 5/6 vegetables (was more mixed with CatBoost before the d
 
 Still open / deferred to a later phase: LLM provider for the advisory module; how satellite NDVI / IoT / behavioral survey data will actually be sourced (GEE auth, IoT data format, survey instrument); SHAP explainability implementation; prototype UI framework choice.
 
-## Application database
+## Backend API
 
-For the `app/` prototype (still deferred, but the database is provisioned ahead of it): a local Docker Postgres instance (container name `postgres`, image `postgres:15.17-trixie`, already running on this Mac Mini — not something this project's tooling starts) hosts a `vegepredict` database, created but with **no schema yet** — this is infrastructure provisioning only, not an ORM/schema design decision.
+`app/backend/` is a standalone FastAPI service — its own `requirements.txt` and `.venv`, deliberately separate from the research pipeline's (`app/backend/.venv` vs. the root `.venv`; don't run backend code with the root venv or vice versa). It serves **pre-computed** forecasts (not live per-request predictions), model comparisons, and historical prices out of Postgres, cache-aside through Redis. Notifications are explicitly deferred (planned, not built).
 
-- Host: `localhost:5432`
-- Database: `vegepredict`
-- User: `postgres` / Password: `pg123` (local dev only — do not reuse these credentials anywhere non-local)
-- Connect via `docker exec postgres psql -U postgres -d vegepredict`, or any Postgres client at the above host/port
+**Infrastructure** (both pre-existing, not started by this project's tooling — a local Docker Postgres instance, container name `postgres`, image `postgres:15.17-trixie`; and a local Docker Redis instance, container name `Redis-main`):
+- Postgres: `localhost:5432`, database `vegepredict`, user `postgres` / password `pg123` (local dev only — do not reuse these credentials anywhere non-local). Connect via `docker exec postgres psql -U postgres -d vegepredict`.
+- Redis: `localhost:6379/0`. Connect via `docker exec Redis-main redis-cli`.
+- Connection strings default to the local values above in `app/backend/config.py` (pydantic-settings); override via an `app/backend/.env` (gitignored) with `VEGEPREDICT_DATABASE_URL`/`VEGEPREDICT_REDIS_URL` if pointing elsewhere. Deliberately separate from `configs/config.yaml`, which holds the research pipeline's domain config, not deployment connection strings.
+
+**Schema** (SQLAlchemy 2.0 async ORM + Alembic migrations, `app/backend/models/`, `app/backend/alembic/versions/`):
+- `historical_price` — one row per (vegetable, week_start): wholesale/retail price, temperature, rainfall, diesel price. Mirrors `data/processed/<vegetable>.csv`.
+- `forecast` — one row per (vegetable, model_family, forecast_date): predicted vs. actual price, `generated_at` (timezone-aware timestamp — see gotcha below). Seeded from `results/metrics/holdout_predictions.csv`.
+- `model_metric` — one row per (vegetable, model_family): MAE/RMSE/MAPE/R², `evaluated_at`. Seeded from `results/metrics/all_results.csv`. **"Best model per vegetable" is always derived by querying for the lowest RMSE, never a denormalized flag** — avoids staleness when metrics update after a retrain.
+
+**Gotcha:** `generated_at`/`evaluated_at` must be `DateTime(timezone=True)` (Postgres `timestamptz`), not plain `DateTime` — the seed script populates them with `datetime.now(timezone.utc)` (timezone-aware), and asyncpg rejects a tz-aware Python value against a `TIMESTAMP WITHOUT TIME ZONE` column. Confirmed by a real failure the first time this was built; fixed via `alembic revision --autogenerate`, not by stripping tzinfo in Python.
+
+**ETL** (`app/backend/seed.py`): idempotent upsert (`INSERT ... ON CONFLICT DO UPDATE` on each table's natural-key unique index) from the same three CSVs `scripts/train_all.py` produces. Safe to re-run after every retrain — not yet wired into an automated pipeline (the natural hook is `auto_retrain.py`'s promotion step, once that exists, see the still-pending auto-retrain tasks). Run manually: `app/backend/.venv/bin/python3 app/backend/seed.py`.
+
+**API endpoints** (`app/backend/routers/`, `app/backend/services/` for the query logic):
+- `GET /health` — DB + Redis connectivity check
+- `GET /vegetables` — the 6 target vegetables
+- `GET /models?vegetable=` — per-vegetable model comparison (MAE/RMSE/MAPE/R²), sorted by RMSE ascending
+- `GET /predictions/{vegetable}?model=best|<family>` — single latest forecast; `model=best` (default) resolves to the lowest-RMSE model family
+- `GET /predictions?vegetable=&model=&year=&limit=&offset=` — filtered/paginated forecast history
+- `GET /prices/{vegetable}/history?start_date=&end_date=&limit=&offset=` — historical prices
+
+All read endpoints are cache-aside through Redis (`app/backend/cache.py` for the generic get/set/invalidate-by-prefix, `app/backend/services/cache_service.py` for key conventions), TTL 7 days (matches the weekly retrain cadence). `cache_service.invalidate_vegetable()` exists for `auto_retrain.py` to call after a successful promote — not yet wired up.
+
+**Interactive docs**: Swagger UI at `/docs`, ReDoc at `/redoc` (both come free from FastAPI's OpenAPI generation). Every endpoint has a `summary`/`description`/`response_description`, every query/path param has a `description` + example value, and every Pydantic schema field (`app/backend/schemas/`) has a `Field(description=...)` — this is deliberately kept up to date so `/docs` is enough for another developer to understand and try the API without reading the source. When adding or changing an endpoint, add the same level of description, don't leave it bare.
+
+**Tests** (`app/backend/tests/`, `pytest` + `httpx.AsyncClient` against the live app, hitting the real seeded Postgres/Redis rather than mocks): run with `app/backend/.venv/bin/python3 -m pytest app/backend/tests/ -c app/backend/pytest.ini`. Coverage includes edge cases per endpoint, not just the happy path: unknown/case-mismatched vegetables, unknown model families (404 on the single-forecast endpoint, empty list rather than an error on the filtered list endpoint — deliberately different, since only `vegetable` is validated against a closed set), out-of-range/invalid pagination (`limit`/`offset` boundaries → 422), invalid date ranges and formats, SQL-injection-shaped input (safe due to parameterized queries — verified the table is still queryable afterward), pagination-page disjointness, and a cross-endpoint consistency check (`/predictions/{veg}?model=best` matches the lowest-RMSE row from `/models`). **Gotcha:** `app/backend/pytest.ini` sets both `asyncio_default_fixture_loop_scope = session` and `asyncio_default_test_loop_scope = session` — required because `cache.py`'s Redis client and `database.py`'s SQLAlchemy engine are module-level singletons created once at import time; pytest-asyncio's default per-test event loop tears down and reopens a loop for every test, which breaks a singleton connection pool opened on an earlier (now-closed) loop with `RuntimeError: Event loop is closed`. Both ini keys are needed — fixture scope alone does not also cover the per-test loop.
+
+Run the API locally: `app/backend/.venv/bin/python3 -m uvicorn app.backend.main:app --reload --port 8000` (from the project root, so the `app.backend.*` absolute imports resolve).
 
 ## Setup
 
@@ -121,6 +146,19 @@ pytest tests/
 pytest tests/test_features.py::test_lag_features   # single test
 ```
 
+**Backend API** (`app/backend/`, own venv — see `## Backend API` above for details):
+
+```bash
+# Seed/refresh Postgres from the CSVs scripts/train_all.py produces
+app/backend/.venv/bin/python3 app/backend/seed.py
+
+# Run the API locally (from the project root, so app.backend.* imports resolve)
+app/backend/.venv/bin/python3 -m uvicorn app.backend.main:app --reload --port 8000
+
+# Run backend tests (hits the real seeded Postgres/Redis)
+app/backend/.venv/bin/python3 -m pytest app/backend/tests/ -c app/backend/pytest.ini
+```
+
 Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/CatBoost/Random Forest params, exogenous feature lists) live in `configs/config.yaml` — do not hardcode them in training scripts.
 
 ## Architecture
@@ -148,6 +186,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `trained_models/<model_family>/` — serialized fitted models, one file per vegetable
 - `results/{figures,tables,metrics,explainability}/` — plots, comparison tables, metric outputs, and SHAP visuals for the paper
 - `app/` — prototype forecast + explanation + advisory interface (web/mobile)
+  - `app/backend/` — FastAPI + Postgres + Redis API (own `requirements.txt`/`.venv`, separate from the root ones). `main.py` (app + router registration), `config.py`/`database.py`/`cache.py` (infra setup), `constants.py` (vegetable list), `models/` (SQLAlchemy ORM: `historical_price`, `forecast`, `model_metric`), `schemas/` (Pydantic response models), `routers/` + `services/` (one pair per resource: vegetables, models, prices, predictions, plus `health`), `seed.py` (idempotent CSV → Postgres ETL), `alembic/` (schema migrations), `tests/` (pytest + httpx against the live app). See `## Backend API` above for endpoints and gotchas.
 - `configs/config.yaml` — vegetables list, data paths, per-model hyperparameters, vegetable/district name mappings
 - `scripts/train_all.py` — orchestrates all 7 model families x 6 vegetables, writes the combined results tables
 - `scripts/fetch_weather_openmeteo.py` — repopulates `data/raw/weather/weather.csv` from Open-Meteo
