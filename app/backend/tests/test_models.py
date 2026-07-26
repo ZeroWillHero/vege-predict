@@ -14,6 +14,14 @@ async def test_list_models_filtered(client):
     assert rmses == sorted(rmses)
 
 
+async def test_list_models_interval_fields_are_sane(client):
+    resp = await client.get("/models", params={"vegetable": "carrot"})
+    assert resp.status_code == 200
+    for row in resp.json():
+        assert row["interval_confidence"] == 0.8
+        assert 0.0 <= row["interval_coverage"] <= 1.0
+
+
 async def test_list_models_unknown_vegetable(client):
     resp = await client.get("/models", params={"vegetable": "durian"})
     assert resp.status_code == 404

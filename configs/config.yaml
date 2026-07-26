@@ -51,6 +51,11 @@ forecasting:
   horizon_weeks: 1  # one-step-ahead (next week) forecast; multi-week-ahead is future work
   holdout_weeks: 52  # final untouched test set, most recent year
   cv_splits: 5        # walk-forward splits over the remaining training data
+  # Prediction interval level: 0.8 -> 10th/90th percentile of the walk-forward CV folds'
+  # out-of-sample residuals, added as a +/- offset around each point forecast. Model-agnostic
+  # (works the same for SARIMAX, tree-based models, and LSTM) — see src/evaluation/metrics.py's
+  # prediction_interval()/interval_coverage().
+  interval_confidence: 0.8
 
 models:
   sarimax:

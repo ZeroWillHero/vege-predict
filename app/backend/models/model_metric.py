@@ -17,4 +17,6 @@ class ModelMetric(Base):
     rmse: Mapped[float] = mapped_column(Float)
     mape: Mapped[float] = mapped_column(Float)
     r2: Mapped[float] = mapped_column(Float)
+    interval_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    interval_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
     evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -17,5 +17,7 @@ class Forecast(Base):
     model_family: Mapped[str] = mapped_column(String(64), index=True)
     forecast_date: Mapped[date] = mapped_column(Date, index=True)
     predicted_price: Mapped[float] = mapped_column(Float)
+    predicted_lower: Mapped[float | None] = mapped_column(Float, nullable=True)
+    predicted_upper: Mapped[float | None] = mapped_column(Float, nullable=True)
     actual_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

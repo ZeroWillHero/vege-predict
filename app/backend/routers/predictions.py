@@ -19,7 +19,9 @@ router = APIRouter()
         "Returns the single most recent forecast for a vegetable. `model=best` (the default) "
         "resolves to whichever model family currently has the lowest holdout RMSE for that "
         "vegetable (see `GET /models`); pass an explicit model family (e.g. `sarimax`, "
-        "`random_forest`, `hybrid_xgboost_sarimax`) to pin to it instead."
+        "`random_forest`, `hybrid_xgboost_sarimax`) to pin to it instead. Alongside the point "
+        "forecast (`predicted_price`), the response includes a `predicted_lower`/`predicted_upper` "
+        "prediction interval — see those fields' descriptions for how it's derived."
     ),
     response_description="The latest forecast row for the resolved model family.",
     responses={

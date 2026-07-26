@@ -44,6 +44,9 @@ app = FastAPI(
         "does not train or run models per-request, it only reads what the last training run "
         "produced. \"Best model\" is always resolved dynamically from the lowest holdout RMSE, "
         "never hardcoded, so it tracks whichever family wins after each retrain.\n\n"
+        "Every forecast also carries a `predicted_lower`/`predicted_upper` prediction interval "
+        "(80% by default), derived from each model's out-of-sample residuals during walk-forward "
+        "cross-validation — not just a bare point estimate.\n\n"
         "All read endpoints are cached in Redis for 7 days (matching the weekly retrain cadence)."
     ),
     openapi_tags=TAGS_METADATA,

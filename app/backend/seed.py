@@ -6,8 +6,11 @@ comparison metrics) — the same three artifacts scripts/train_all.py produces.
 
 Idempotent: every insert is an upsert on the table's natural-key unique index, so
 re-running this after a retrain updates existing rows rather than duplicating them.
-Standalone for now; the natural place to call this is from auto_retrain.py's
-promotion step once that exists (see CLAUDE.md's auto-retrain pipeline notes).
+Also invalidates each vegetable's Redis cache entries after a successful commit, so a
+re-seed is immediately visible through the API rather than serving stale cached JSON
+for up to the 7-day TTL. Standalone for now; the natural place to *call* this script is
+from auto_retrain.py's promotion step once that exists (see CLAUDE.md's auto-retrain
+pipeline notes) — the invalidation itself already happens here, not deferred to that.
 
 Usage:
     python seed.py
@@ -26,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from app.backend.constants import VEGETABLES  # noqa: E402
 from app.backend.database import async_session_factory  # noqa: E402
 from app.backend.models import Forecast, HistoricalPrice, ModelMetric  # noqa: E402
+from app.backend.services.cache_service import invalidate_vegetable  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -67,6 +71,8 @@ async def seed_forecasts(session) -> int:
             "model_family": row["model"],
             "forecast_date": row["date"].date(),
             "predicted_price": row["predicted"],
+            "predicted_lower": None if pd.isna(row.get("predicted_lower")) else row["predicted_lower"],
+            "predicted_upper": None if pd.isna(row.get("predicted_upper")) else row["predicted_upper"],
             "actual_price": row["actual"],
             "generated_at": generated_at,
         }
@@ -75,7 +81,10 @@ async def seed_forecasts(session) -> int:
     stmt = insert(Forecast).values(rows)
     stmt = stmt.on_conflict_do_update(
         index_elements=["vegetable", "model_family", "forecast_date"],
-        set_={c: stmt.excluded[c] for c in ["predicted_price", "actual_price", "generated_at"]},
+        set_={
+            c: stmt.excluded[c]
+            for c in ["predicted_price", "predicted_lower", "predicted_upper", "actual_price", "generated_at"]
+        },
     )
     await session.execute(stmt)
     return len(rows)
@@ -93,6 +102,8 @@ async def seed_model_metrics(session) -> int:
             "rmse": row["rmse"],
             "mape": row["mape"],
             "r2": row["r2"],
+            "interval_confidence": None if pd.isna(row.get("interval_confidence")) else row["interval_confidence"],
+            "interval_coverage": None if pd.isna(row.get("interval_coverage")) else row["interval_coverage"],
             "evaluated_at": evaluated_at,
         }
         for _, row in df.iterrows()
@@ -100,7 +111,10 @@ async def seed_model_metrics(session) -> int:
     stmt = insert(ModelMetric).values(rows)
     stmt = stmt.on_conflict_do_update(
         index_elements=["vegetable", "model_family"],
-        set_={c: stmt.excluded[c] for c in ["mae", "rmse", "mape", "r2", "evaluated_at"]},
+        set_={
+            c: stmt.excluded[c]
+            for c in ["mae", "rmse", "mape", "r2", "interval_confidence", "interval_coverage", "evaluated_at"]
+        },
     )
     await session.execute(stmt)
     return len(rows)
@@ -112,6 +126,11 @@ async def main():
         n_forecasts = await seed_forecasts(session)
         n_metrics = await seed_model_metrics(session)
         await session.commit()
+
+        for vegetable in VEGETABLES:
+            await invalidate_vegetable(vegetable)
+        print(f"Invalidated Redis cache for {len(VEGETABLES)} vegetables")
+
         print(f"historical_price: {n_prices} rows upserted")
         print(f"forecast: {n_forecasts} rows upserted")
         print(f"model_metric: {n_metrics} rows upserted")

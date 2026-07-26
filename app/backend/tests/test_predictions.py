@@ -6,6 +6,22 @@ async def test_latest_prediction_best(client):
     assert body["model_family"] == "random_forest"
 
 
+async def test_latest_prediction_has_sane_interval(client):
+    resp = await client.get("/predictions/carrot", params={"model": "best"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["predicted_lower"] is not None
+    assert body["predicted_upper"] is not None
+    assert body["predicted_lower"] <= body["predicted_price"] <= body["predicted_upper"]
+
+
+async def test_list_predictions_interval_bounds_are_consistent(client):
+    resp = await client.get("/predictions", params={"vegetable": "carrot", "limit": 10})
+    assert resp.status_code == 200
+    for row in resp.json():
+        assert row["predicted_lower"] <= row["predicted_price"] <= row["predicted_upper"]
+
+
 async def test_latest_prediction_specific_model(client):
     resp = await client.get("/predictions/carrot", params={"model": "sarimax"})
     assert resp.status_code == 200
