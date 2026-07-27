@@ -49,10 +49,10 @@ class SarimaxArtifact:
         return fc.predicted_mean.values
 
 
-def _fit(train_df, config):
+def _fit(train_df, config, order=None, seasonal_order=None):
     exog_cols = config["models"]["sarimax"]["exog_features"]
-    order = tuple(config["models"]["sarimax"]["order"])
-    seasonal_order = tuple(config["models"]["sarimax"]["seasonal_order"])
+    order = order or tuple(config["models"]["sarimax"]["order"])
+    seasonal_order = seasonal_order or tuple(config["models"]["sarimax"]["seasonal_order"])
     # NOTE: simple_differencing=True must NOT be combined with exog here — it breaks
     # out-of-sample exog extension in statsmodels and produces divergent forecasts
     # (confirmed empirically: predictions swung to +/-700 on a 100-900 price series).
@@ -67,32 +67,49 @@ def _fit(train_df, config):
     return model.fit(disp=False, maxiter=200)
 
 
-def make_fit_predict(config):
+def get_order_for_vegetable(vegetable: str, config: dict) -> tuple:
+    """AIC-selected (p,d,q) if available (results/tables/sarimax_order_selection.csv via
+    scripts/select_sarimax_order.py), else the global default order."""
+    overrides = config["models"]["sarimax"].get("order_by_vegetable", {})
+    if vegetable in overrides:
+        return tuple(overrides[vegetable])
+    return tuple(config["models"]["sarimax"]["order"])
+
+
+def make_fit_predict(config, order=None):
     exog_cols = config["models"]["sarimax"]["exog_features"]
 
     def fit_predict(train_df, test_df, feature_cols):
-        res = _fit(train_df, config)
+        res = _fit(train_df, config, order=order)
         forecast = res.get_forecast(steps=len(test_df), exog=test_df[exog_cols])
         return forecast.predicted_mean.values
 
     return fit_predict
 
 
-def make_fit_final(config):
+def make_fit_final(config, order=None):
     exog_cols = config["models"]["sarimax"]["exog_features"]
-    order = tuple(config["models"]["sarimax"]["order"])
     seasonal_order = tuple(config["models"]["sarimax"]["seasonal_order"])
+    order = order or tuple(config["models"]["sarimax"]["order"])
 
     def fit_final(full_df, feature_cols, vegetable):
-        res = _fit(full_df, config)
+        res = _fit(full_df, config, order=order)
         return SarimaxArtifact(res.params, order, seasonal_order, exog_cols, full_df)
 
     return fit_final
 
 
-def train_all_vegetables(config: dict, vegetables=None) -> list:
+def train_all_vegetables(config: dict, vegetables=None):
     vegetables = vegetables or config["vegetables"]
-    return run_for_vegetables(vegetables, MODEL_FAMILY, config, make_fit_predict(config), make_fit_final(config))
+    results, predictions = [], []
+    for vegetable in vegetables:
+        order = get_order_for_vegetable(vegetable, config)
+        r, p = run_for_vegetables(
+            [vegetable], MODEL_FAMILY, config, make_fit_predict(config, order), make_fit_final(config, order)
+        )
+        results.extend(r)
+        predictions.extend(p)
+    return results, predictions
 
 
 def main():

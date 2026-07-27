@@ -18,19 +18,19 @@ Target vegetables: **carrot, brinjal, pumpkin, cabbage, snake gourd, leeks**.
 **Beyond forecasting**, the proposal's remaining objectives:
 - **Explainability** (`src/explainability/`) — SHAP feature attribution across models, so forecasts are transparent to farmers/traders, not a black box
 - **Advisory** (`src/advisory/`) — an LLM turns a forecast + its SHAP explanation into a farmer-friendly natural-language recommendation
-- **Prototype** (`app/`) — a web/mobile interface surfacing forecasts, SHAP visualizations, and LLM advisory messages
+- **Prototype** (`app/`) — a web/mobile interface surfacing forecasts, SHAP visualizations, and LLM advisory messages. Its backend (`app/backend/`) is built: a FastAPI + Postgres + Redis API serving pre-computed forecasts, model comparisons, and historical prices — see `## Backend API` below. The frontend itself is still deferred.
 
 Evaluation is via time-series cross-validation (walk-forward, `src.evaluation.metrics.time_series_splits`) plus a final untouched holdout, comparing models on MAE, RMSE, MAPE, and R².
 
 ## Project status
 
-**Phase: forecasting models — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, and the prototype UI are still deferred (scoped out of this phase deliberately, not forgotten).
+**Phase: forecasting models — implemented and runnable end-to-end. Backend API (`app/backend/`) — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, the auto-retrain pipeline, and the prototype frontend UI are still deferred (scoped out of this phase deliberately, not forgotten).
 
 Resolved decisions (were open questions earlier; now settled and reflected in code/config):
 - **Forecast target**: `retail_price` (not wholesale) — `forecasting.target_column` in config.
 - **Weather↔vegetable mapping**: each vegetable mapped to one representative growing district (`weather_district_map` in config) rather than a national average — see the table in the plan/commit history if the rationale needs revisiting.
 - **LSTM framework**: TensorFlow/Keras (installed in `.venv`).
-- **Fuel feature**: `diesel_price`, not `petrol92_price` (transport-cost driver, matches the literature).
+- **Fuel feature**: `diesel_price` only — `petrol92_price` was removed from `data/raw/fuel/fuel_data_weekly.csv` entirely (not just unused in code), since diesel is the transport-cost driver for produce trucks and petrol has no link to the vegetable supply chain (matches the literature).
 - **Vegetable name mismatch**: raw CSV uses `BRINJALS`/`SNAKE GOURD`/etc.; `vegetable_name_map` in config bridges this to the lowercase config names.
 - **Data alignment**: usable range across all 3 raw sources is 2015-01-05 to 2025-12-22 (fuel data is the binding start constraint, price data the binding end constraint) — `aligned_start_date`/`aligned_end_date` in config.
 
@@ -38,22 +38,66 @@ Known technical gotchas (if touching `src/models/sarimax/`):
 - `simple_differencing=True` combined with `exog` breaks statsmodels' out-of-sample forecasting — it was tried for speed and produced forecasts that diverged to nonsensical values (confirmed empirically). Do not re-enable it without re-verifying holdout predictions stay in a sane range.
 - Never pickle a fitted `SARIMAXResultsWrapper` directly — with `seasonal_order` period 52, it balloons to ~320MB per artifact (the Kalman filter's full state/covariance history). Use `SarimaxArtifact` (`src/models/sarimax/train.py`) instead: it stores just `params` + a small history frame and reconstructs via `.filter(params)`, at ~20KB with byte-identical forecasts. `HybridSarimaxResidualModel` (`src/models/hybrid_xgboost_sarimax/train.py`) already builds on this — don't regress it back to storing the raw results object.
 
+## Model selection criteria
+
+Two different criteria are used deliberately, for two different questions:
+
+- **Best model family per vegetable** (the headline result): **holdout RMSE**. AIC is only well-defined for likelihood-based models like SARIMAX — there's no standard AIC for Random Forest, XGBoost, CatBoost, or an LSTM, so it can't be used to compare across these heterogeneous families. Out-of-sample error is the standard approach for this (as in the M-competitions).
+- **SARIMAX's own (p,d,q) order**: **AIC**, via `scripts/select_sarimax_order.py` — standard Box-Jenkins order identification. Searches (p,1,q) for p,q ∈ {0,1,2} per vegetable (d=1 and seasonal_order=(1,0,1,52) held fixed, both already established as necessary/stable — see gotchas above), fits each candidate on the full series, and picks the AIC-minimizer. Results in `results/tables/sarimax_order_selection.csv`; the selected orders are wired into `configs/config.yaml` as `models.sarimax.order_by_vegetable`, which every SARIMAX-based model (`sarimax`, both hybrids) now reads per vegetable via `get_order_for_vegetable()`.
+- **Important**: the AIC-selected order does not uniformly beat the arbitrary (1,1,1) baseline it replaced on holdout RMSE — it helped substantially for pumpkin (RMSE 110.8→57.5) and leeks, but slightly hurt carrot, brinjal, and snake_gourd. This is expected, not a bug: AIC measures in-sample fit quality, not out-of-sample generalization. It's still the methodologically correct way to *choose the order* — it just was never going to guarantee the best holdout score, which is exactly why the headline "best model" decision uses holdout RMSE instead.
+
 Environment: project uses an isolated `.venv` (not system/Anaconda Python) — see Setup below. Verified working on Apple Silicon (M4).
 
-**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`):
+**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order; holdout is always the most recent 52 weeks of whatever data exists, so it shifted forward to ~Jun 2025-Jun 2026 after the HARTI/CPC data update — not directly comparable to earlier snapshots of this table):
 
 | vegetable | catboost | random_forest | xgboost | lstm | sarimax | hybrid_xgb+sarimax | hybrid_cb+sarimax |
 |---|---|---|---|---|---|---|---|
-| carrot | 114.4 | **133.1** | 184.2 | 163.7 | 314.1 | 268.6 | 296.7 |
-| brinjal | 96.9 | **82.3** | 106.6 | 137.0 | 115.2 | 139.5 | 133.7 |
-| pumpkin | 26.8 | **22.8** | 23.3 | 65.6 | 110.8 | 111.3 | 110.6 |
-| cabbage | 62.2 | **42.2** | 50.6 | 99.0 | 97.4 | 109.9 | 109.5 |
-| snake_gourd | **71.5** | 62.5 | 72.7 | 87.1 | 95.4 | 108.2 | 105.8 |
-| leeks | **46.0** | 47.7 | 49.7 | 66.2 | 75.1 | 74.2 | 74.8 |
+| carrot | 112.7 | **100.9** | 108.2 | 183.1 | 245.7 | 254.6 | 243.9 |
+| brinjal | 98.0 | **90.7** | 100.5 | 140.9 | 124.2 | 128.3 | 131.5 |
+| pumpkin | 26.8 | **22.8** | 23.3 | 68.1 | 57.5 | 59.3 | 58.7 |
+| cabbage | 62.0 | **48.2** | 49.9 | 118.5 | 110.8 | 116.8 | 115.1 |
+| snake_gourd | 71.5 | **62.5** | 72.7 | 99.4 | 108.3 | 123.1 | 120.1 |
+| leeks | **48.5** | 50.3 | 51.8 | 66.4 | 95.7 | 98.7 | 95.4 |
 
-Random Forest and CatBoost dominate every vegetable; SARIMAX and both SARIMAX-hybrids are consistently the worst performers. This is a genuine finding, not a bug: SARIMAX's own fit is poor on the recent (volatile) holdout year (all its R² values are negative), and because the hybrids are additive on top of that poor baseline, they inherit and compound its error rather than correcting it — the residual-correction framing only helps when the underlying statistical model is reasonably good. Worth a discussion-section paragraph in the thesis; don't read it as "the pipeline is broken."
+Random Forest now wins 5/6 vegetables (was more mixed with CatBoost before the data update); CatBoost still wins leeks narrowly. SARIMAX and both SARIMAX-hybrids remain the worst performers on every vegetable even with AIC-selected orders — still a genuine finding, not a bug: SARIMAX's own fit is poor on the (still volatile) holdout year, all its R² values are negative, and the hybrids inherit that error rather than correcting it. Don't read the model ranking numbers as fixed — they move with the holdout window, which moves with the data; re-run `scripts/train_all.py` after any data update and expect the table to shift. (LSTM's column also shifts slightly between identical re-runs on the same data — it's the only stochastic model in the grid, seeded by weight initialization; the other six are deterministic given the same input.)
+
+**Forecast prediction rows** (`results/metrics/holdout_predictions.csv`, 2,184 = 6 vegetables × 7 models × 52 weeks) and **AIC order-search rows** (`results/tables/sarimax_order_selection.csv`, 54 = 6 vegetables × 9 candidate orders) should be regenerated together whenever the SARIMAX order changes — run `scripts/select_sarimax_order.py` first, update `order_by_vegetable` if orders shift, then `scripts/train_all.py`.
 
 Still open / deferred to a later phase: LLM provider for the advisory module; how satellite NDVI / IoT / behavioral survey data will actually be sourced (GEE auth, IoT data format, survey instrument); SHAP explainability implementation; prototype UI framework choice.
+
+## Backend API
+
+`app/backend/` is a standalone FastAPI service — its own `requirements.txt` and `.venv`, deliberately separate from the research pipeline's (`app/backend/.venv` vs. the root `.venv`; don't run backend code with the root venv or vice versa). It serves **pre-computed** forecasts (not live per-request predictions), model comparisons, and historical prices out of Postgres, cache-aside through Redis. Notifications are explicitly deferred (planned, not built).
+
+**Infrastructure** (both pre-existing, not started by this project's tooling — a local Docker Postgres instance, container name `postgres`, image `postgres:15.17-trixie`; and a local Docker Redis instance, container name `Redis-main`):
+- Postgres: `localhost:5432`, database `vegepredict`, user `postgres` / password `pg123` (local dev only — do not reuse these credentials anywhere non-local). Connect via `docker exec postgres psql -U postgres -d vegepredict`.
+- Redis: `localhost:6379/0`. Connect via `docker exec Redis-main redis-cli`.
+- Connection strings default to the local values above in `app/backend/config.py` (pydantic-settings); override via an `app/backend/.env` (gitignored) with `VEGEPREDICT_DATABASE_URL`/`VEGEPREDICT_REDIS_URL` if pointing elsewhere. Deliberately separate from `configs/config.yaml`, which holds the research pipeline's domain config, not deployment connection strings.
+
+**Schema** (SQLAlchemy 2.0 async ORM + Alembic migrations, `app/backend/models/`, `app/backend/alembic/versions/`):
+- `historical_price` — one row per (vegetable, week_start): wholesale/retail price, temperature, rainfall, diesel price. Mirrors `data/processed/<vegetable>.csv`.
+- `forecast` — one row per (vegetable, model_family, forecast_date): predicted vs. actual price, `predicted_lower`/`predicted_upper` (the prediction interval — see Architecture below), `generated_at` (timezone-aware timestamp — see gotcha below). Seeded from `results/metrics/holdout_predictions.csv`.
+- `model_metric` — one row per (vegetable, model_family): MAE/RMSE/MAPE/R², `interval_confidence`/`interval_coverage` (nominal vs. empirically observed prediction-interval calibration), `evaluated_at`. Seeded from `results/metrics/all_results.csv`. **"Best model per vegetable" is always derived by querying for the lowest RMSE, never a denormalized flag** — avoids staleness when metrics update after a retrain.
+
+**Gotcha:** `generated_at`/`evaluated_at` must be `DateTime(timezone=True)` (Postgres `timestamptz`), not plain `DateTime` — the seed script populates them with `datetime.now(timezone.utc)` (timezone-aware), and asyncpg rejects a tz-aware Python value against a `TIMESTAMP WITHOUT TIME ZONE` column. Confirmed by a real failure the first time this was built; fixed via `alembic revision --autogenerate`, not by stripping tzinfo in Python.
+
+**ETL** (`app/backend/seed.py`): idempotent upsert (`INSERT ... ON CONFLICT DO UPDATE` on each table's natural-key unique index) from the same three CSVs `scripts/train_all.py` produces. Safe to re-run after every retrain — not yet wired into an automated pipeline (the natural hook is `auto_retrain.py`'s promotion step, once that exists, see the still-pending auto-retrain tasks). Run manually: `app/backend/.venv/bin/python3 app/backend/seed.py`.
+
+**API endpoints** (`app/backend/routers/`, `app/backend/services/` for the query logic):
+- `GET /health` — DB + Redis connectivity check
+- `GET /vegetables` — the 6 target vegetables
+- `GET /models?vegetable=` — per-vegetable model comparison (MAE/RMSE/MAPE/R²), sorted by RMSE ascending
+- `GET /predictions/{vegetable}?model=best|<family>` — single latest forecast; `model=best` (default) resolves to the lowest-RMSE model family
+- `GET /predictions?vegetable=&model=&year=&limit=&offset=` — filtered/paginated forecast history
+- `GET /prices/{vegetable}/history?start_date=&end_date=&limit=&offset=` — historical prices
+
+All read endpoints are cache-aside through Redis (`app/backend/cache.py` for the generic get/set/invalidate-by-prefix, `app/backend/services/cache_service.py` for key conventions), TTL 7 days (matches the weekly retrain cadence). **Gotcha, confirmed by a real bug:** a bare Postgres reseed does *not* invalidate Redis — the API kept serving pre-retrain cached JSON (missing the newly added prediction-interval fields) until `seed.py` started calling `cache_service.invalidate_vegetable()` for every vegetable after its commit. Any future write path that changes `forecast`/`model_metric`/`historical_price` data (the still-pending `auto_retrain.py` included) must invalidate the same way — don't reintroduce a bare commit with no cache invalidation. Guarded by `app/backend/tests/test_cache_invalidation.py`.
+
+**Interactive docs**: Swagger UI at `/docs`, ReDoc at `/redoc` (both come free from FastAPI's OpenAPI generation). Every endpoint has a `summary`/`description`/`response_description`, every query/path param has a `description` + example value, and every Pydantic schema field (`app/backend/schemas/`) has a `Field(description=...)` — this is deliberately kept up to date so `/docs` is enough for another developer to understand and try the API without reading the source. When adding or changing an endpoint, add the same level of description, don't leave it bare.
+
+**Tests** (`app/backend/tests/`, `pytest` + `httpx.AsyncClient` against the live app, hitting the real seeded Postgres/Redis rather than mocks): run with `app/backend/.venv/bin/python3 -m pytest app/backend/tests/ -c app/backend/pytest.ini`. Coverage includes edge cases per endpoint, not just the happy path: unknown/case-mismatched vegetables, unknown model families (404 on the single-forecast endpoint, empty list rather than an error on the filtered list endpoint — deliberately different, since only `vegetable` is validated against a closed set), out-of-range/invalid pagination (`limit`/`offset` boundaries → 422), invalid date ranges and formats, SQL-injection-shaped input (safe due to parameterized queries — verified the table is still queryable afterward), pagination-page disjointness, and a cross-endpoint consistency check (`/predictions/{veg}?model=best` matches the lowest-RMSE row from `/models`). **Gotcha:** `app/backend/pytest.ini` sets both `asyncio_default_fixture_loop_scope = session` and `asyncio_default_test_loop_scope = session` — required because `cache.py`'s Redis client and `database.py`'s SQLAlchemy engine are module-level singletons created once at import time; pytest-asyncio's default per-test event loop tears down and reopens a loop for every test, which breaks a singleton connection pool opened on an earlier (now-closed) loop with `RuntimeError: Event loop is closed`. Both ini keys are needed — fixture scope alone does not also cover the per-test loop.
+
+Run the API locally: `app/backend/.venv/bin/python3 -m uvicorn app.backend.main:app --reload --port 8000` (from the project root, so the `app.backend.*` absolute imports resolve).
 
 ## Setup
 
@@ -102,6 +146,19 @@ pytest tests/
 pytest tests/test_features.py::test_lag_features   # single test
 ```
 
+**Backend API** (`app/backend/`, own venv — see `## Backend API` above for details):
+
+```bash
+# Seed/refresh Postgres from the CSVs scripts/train_all.py produces
+app/backend/.venv/bin/python3 app/backend/seed.py
+
+# Run the API locally (from the project root, so app.backend.* imports resolve)
+app/backend/.venv/bin/python3 -m uvicorn app.backend.main:app --reload --port 8000
+
+# Run backend tests (hits the real seeded Postgres/Redis)
+app/backend/.venv/bin/python3 -m pytest app/backend/tests/ -c app/backend/pytest.ini
+```
+
 Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/CatBoost/Random Forest params, exogenous feature lists) live in `configs/config.yaml` — do not hardcode them in training scripts.
 
 ## Architecture
@@ -113,6 +170,12 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 **Per-vegetable, per-model artifacts:** every vegetable is modeled independently (no cross-vegetable pooling), and every model family is trained separately per vegetable. Expect `6 vegetables × 7 model families = 42` trained artifacts, plus corresponding metrics rows in `results/metrics/`.
 
 **Evaluation:** `src/evaluation/metrics.py` is the single source of truth for MAE/RMSE/MAPE — all training scripts and notebooks should import from there rather than reimplementing metrics, so comparisons across model families stay apples-to-apples.
+
+**Prediction intervals:** every model's holdout predictions also carry a `predicted_lower`/`predicted_upper` band — model-agnostic, not model-specific (no quantile regression, no MC dropout, no per-family special-casing). `common.run_training` pools the walk-forward CV folds' out-of-sample residuals (actual − predicted, concatenated across all 5 folds — *not* the holdout's own residuals, to avoid a circular interval), takes the empirical percentiles at `forecasting.interval_confidence` (default 0.8 → 10th/90th percentile) via `metrics.prediction_interval()`, and adds that offset to the holdout point forecasts. `metrics.interval_coverage()` then reports what fraction of holdout actuals actually landed inside the band — this is the real calibration check, logged per vegetable/model as `interval_coverage` in `results/metrics/all_results.csv` alongside MAE/RMSE/MAPE/R². See `research-papers/drafts/thesis/03_methodology.md` Section 3.6 for the full write-up, including the known limitation (pooling residuals equally across differently-sized expanding CV folds).
+
+**Calibration varies a lot by vegetable, and that's a real finding, not noise**: for each vegetable's *best* (lowest-RMSE) model, empirical coverage against the nominal 0.8 ranges from ~0.54 (carrot, brinjal — the interval is too narrow, understating uncertainty) to ~0.81 (pumpkin — well-calibrated). Random Forest, the winner on 5/6 vegetables, apparently has more volatile out-of-holdout errors than its CV-fold residuals suggest for the harder-to-forecast vegetables. Don't quote "80% interval" as if it's uniformly true — check `interval_coverage` per vegetable before making a calibration claim in the thesis.
+
+**Forecast verification:** `common.run_training` returns both the metrics dict and the holdout-period `(date, actual, predicted, predicted_lower, predicted_upper)` series; `scripts/train_all.py` concatenates the latter into `results/metrics/holdout_predictions.csv` (2,184 rows = 6 vegetables × 7 models × 52 holdout weeks). `notebooks/03_model_results.ipynb` plots these as forecast-vs-actual charts (and residuals), saved to `results/figures/forecast_vs_actual_*.png` — don't rely on RMSE/R² tables alone to sanity-check a model; look at the actual curve.
 
 ## Folder layout
 
@@ -127,22 +190,26 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `trained_models/<model_family>/` — serialized fitted models, one file per vegetable
 - `results/{figures,tables,metrics,explainability}/` — plots, comparison tables, metric outputs, and SHAP visuals for the paper
 - `app/` — prototype forecast + explanation + advisory interface (web/mobile)
+  - `app/backend/` — FastAPI + Postgres + Redis API (own `requirements.txt`/`.venv`, separate from the root ones). `main.py` (app + router registration), `config.py`/`database.py`/`cache.py` (infra setup), `constants.py` (vegetable list), `models/` (SQLAlchemy ORM: `historical_price`, `forecast`, `model_metric`), `schemas/` (Pydantic response models), `routers/` + `services/` (one pair per resource: vegetables, models, prices, predictions, plus `health`), `seed.py` (idempotent CSV → Postgres ETL), `alembic/` (schema migrations), `tests/` (pytest + httpx against the live app). See `## Backend API` above for endpoints and gotchas.
 - `configs/config.yaml` — vegetables list, data paths, per-model hyperparameters, vegetable/district name mappings
 - `scripts/train_all.py` — orchestrates all 7 model families x 6 vegetables, writes the combined results tables
 - `scripts/fetch_weather_openmeteo.py` — repopulates `data/raw/weather/weather.csv` from Open-Meteo
 - `notebooks/` — exploratory analysis; production logic belongs in `src/`, not notebooks. `01_data_exploration.ipynb`, `02_feature_engineering.ipynb`, `03_model_results.ipynb` (the last needs `results/metrics/all_results.csv` from `scripts/train_all.py` to exist first)
 - `research-papers/references/` — literature (PDFs, papers) informing the methodology; gitignored (not checked in), fetch again from `## Literature status` below if missing
-- `research-papers/drafts/thesis/` — the thesis chapters (`01_introduction.md`, `02_literature_review.md`, ...)
+- `research-papers/drafts/thesis/` — the thesis chapters (`01_introduction.md`, `02_literature_review.md`, `03_methodology.md`, ...)
 
 ## Documentation stays in sync with research
 
-This is a research project, not just a codebase — the docs are part of the deliverable. Whenever research content changes (new papers found, scope/objectives change, a literature claim is added or superseded, methodology decisions are made), update the relevant doc in the same session, don't leave it for later:
+This is a research project, not just a codebase — the docs are part of the deliverable. Whenever research content changes (new papers found, scope/objectives change, a literature claim is added or superseded, methodology decisions are made), update the relevant doc in the same session, don't leave it for later. This isn't optional or best-effort: after finishing any implementation task, explicitly check each bullet below against what just changed, and write the update if one applies — silence is only correct when none of them apply, not the default.
 - New objectives, model families, or data sources → update `## Project` above and the folder layout
 - New papers read → update `research-papers/drafts/thesis/02_literature_review.md` (and its References list) and the `## Literature status` list below
 - New introduction/problem-statement framing → update `research-papers/drafts/thesis/01_introduction.md`
+- New methodology decisions — evaluation protocol changes (e.g. prediction intervals, new CV scheme), hyperparameter tuning approach, model-selection criteria, or any other "how we did it" decision that isn't just a code detail → update `research-papers/drafts/thesis/03_methodology.md`. If the decision changed a result worth reporting (a metric, a comparison table), update the relevant numbers there too, not just the narrative.
 
 ## Literature status
 
 Sourced and read (in `research-papers/references/`, cited in `02_literature_review.md`): Madubhashini (2021/2023) — Sri Lanka, first SL-specific ML study; Ranaweera, Rathnayake & Ananda (2023) — Sri Lanka, beans/brinjal/carrot/pumpkin, RF best, same 4 exogenous features (rainfall, temperature, fuel price, production) as this project's config; Ruhunuge et al. (2024) — Sri Lanka, carrot-specific VAR climate causality; Weerasekara et al. (2026) — Sri Lanka, most advanced prior work (multi-market/season/regime XGBoost+LightGBM); Paul et al. (2022) — brinjal, India; Zhao et al. (2025) — TCN-XGBoost hybrid; Patil et al. (2023) — HySALS hybrid SARIMA-LSTM; Mayank, Shelke & Roy (2025); Shree Sanjay & Janarthanan (2025).
+
+**MLOps / automated retraining** (Section 2.9, sourced for the `feature/auto-train-MLIOPs` application-side work): Garg et al. (2022) — CI/CD/CT/CM MLOps lifecycle; Meisenbacher et al. (2022) — automated forecasting pipeline review, most cover only 2-3 of 5 stages; Pham et al. (2024) — data vs. concept drift, semi-supervised detection; Katalay, Dimandja & Masakuna (2025) — multi-criteria statistical drift-triggered retraining (PSI, KL divergence); Jain et al. (2020) — crop price context-based retraining + data-quality monitoring (IBM, India); Zelingher (2025) — AGRICAF, explainable ML + econometrics for farmer-accessible commodity forecasts. Key takeaway used in the auto-train plan: tree-based models (RF/XGBoost/CatBoost) have no incremental-learning mode and need full refits; SARIMAX refitting is the computational bottleneck (confirmed empirically in this project); given this project's scale (single machine, weekly data, ~10-15min full retrain), a scheduled retrain + validation gate is the right-sized design, not full drift-detection infrastructure.
 
 **Not yet sourced** — needed before objectives 3–4 can be written up: explainable AI (SHAP) applied to price/agricultural forecasting; LLM-based farmer advisory systems. Do not write those literature subsections from memory — search and read first.

@@ -34,10 +34,16 @@ data:
   raw_iot_dir: data/raw/iot
   raw_behavioral_dir: data/raw/behavioral
   processed_dir: data/processed
-  # Aligned overlap across price/fuel/weather sources (fuel data starts 2015-01-05,
-  # price data ends 2025-12-22 as of this run).
+  # Aligned overlap across price/fuel/weather sources (fuel data starts 2015-01-05).
+  # End date is price-bound: fuel now extends to 2026-07-20 (cpc_fuel.py) and
+  # weather to 2026-07-20 too, but vegetable_prices.csv's HARTI backfill only
+  # reaches 2026-06-22, with an internal gap 2025-12-29..2026-03-09 (HARTI didn't
+  # publish weeks 1-10/12/15/21 of 2026 — see CLAUDE.md's auto-retrain pipeline
+  # notes). build_dataset.py's inner join naturally skips gap weeks; no special
+  # handling needed. Re-check all three sources' max dates before bumping this
+  # further; a stale value here silently discards new data.
   aligned_start_date: "2015-01-05"
-  aligned_end_date: "2025-12-22"
+  aligned_end_date: "2026-06-22"
 
 forecasting:
   target_column: retail_price
@@ -45,16 +51,32 @@ forecasting:
   horizon_weeks: 1  # one-step-ahead (next week) forecast; multi-week-ahead is future work
   holdout_weeks: 52  # final untouched test set, most recent year
   cv_splits: 5        # walk-forward splits over the remaining training data
+  # Prediction interval level: 0.8 -> 10th/90th percentile of the walk-forward CV folds'
+  # out-of-sample residuals, added as a +/- offset around each point forecast. Model-agnostic
+  # (works the same for SARIMAX, tree-based models, and LSTM) — see src/evaluation/metrics.py's
+  # prediction_interval()/interval_coverage().
+  interval_confidence: 0.8
 
 models:
   sarimax:
-    order: [1, 1, 1]
+    order: [1, 1, 1]  # fallback default; per-vegetable AIC-selected orders below take precedence
     # s=52 (annual seasonality for weekly data), matching Champika & Mugera's
     # SARIMA(3,1,2)(0,0,2)[52] for Sri Lankan carrot prices (cited in the lit review).
     # D=0 (no seasonal differencing): D=1 at s=52 was empirically unstable (forecasts
     # diverged to implausible values) with only ~10 seasonal cycles of training data.
     seasonal_order: [1, 0, 1, 52]
     exog_features: [average_rainfall, average_temperature, diesel_price]
+    # (p,d,q) selected by AIC-minimizing grid search (d=1 fixed, seasonal_order fixed
+    # as above) via scripts/select_sarimax_order.py; see results/tables/sarimax_order_selection.csv
+    # for the full candidate grid and AIC/BIC per vegetable. Re-run that script and update
+    # this block if the underlying price data changes materially.
+    order_by_vegetable:
+      carrot: [0, 1, 2]
+      brinjal: [2, 1, 2]
+      pumpkin: [2, 1, 2]
+      cabbage: [2, 1, 2]
+      snake_gourd: [2, 1, 2]
+      leeks: [1, 1, 2]
   lstm:
     lookback: 30
     units: 64
