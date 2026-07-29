@@ -63,34 +63,25 @@ mkdir -p ~/Research-Project
 rsync -avz data/raw/ <EC2_USER>@<EC2_HOST>:~/Research-Project/data/raw/
 ```
 
-## 7. One manual sync + create both virtualenvs
+## 7. One manual sync
 
-The venvs need the tracked `requirements.txt` files present first, so do one
-manual sync now (the workflow handles this automatically from here on):
+`deploy/train.sh` and `deploy/seed.sh` bootstrap their own venvs (installing
+`uv` itself if it's missing, via `deploy/ensure_venv.sh`) — nothing to install
+by hand. Just get the tracked files onto the box once, since the workflow
+only *syncs* on top of what's already there:
 
 ```bash
 # from your dev machine
 git archive --format=tar HEAD | ssh <EC2_USER>@<EC2_HOST> 'tar -x -C ~/Research-Project'
 ```
 
-```bash
-# on the instance — two separate venvs, matching the project's existing local
-# convention (root research pipeline vs. backend — see CLAUDE.md, don't mix them)
-cd ~/Research-Project
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-python3 -m venv app/backend/.venv
-app/backend/.venv/bin/pip install -r app/backend/requirements.txt
-```
-
 ## 8. First run
 
 ```bash
 chmod +x deploy/*.sh
-deploy/train.sh    # ~10-15 min, writes trained_models/ + results/
+deploy/train.sh    # bootstraps .venv via uv, then trains (~10-15 min), writes trained_models/ + results/
 deploy/deploy.sh   # brings up nginx/postgres/redis/api, runs migrations
-deploy/seed.sh     # loads results into Postgres, warms/invalidates Redis
+deploy/seed.sh     # bootstraps app/backend/.venv via uv, seeds Postgres, warms/invalidates Redis
 ```
 
 Confirm at `http://<ec2-host>/health`, then set up TLS once DNS points at the
