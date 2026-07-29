@@ -8,7 +8,7 @@ catboost_info/
 .env
 .pytest_cache/
 
-data/raw/*
+# data/raw/*
 data/processed/*
 data/external/*
 !data/raw/**/.gitkeep
