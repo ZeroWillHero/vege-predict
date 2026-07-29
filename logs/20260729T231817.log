@@ -1,0 +1,409 @@
+Using CPython 3.13.9 interpreter at: /opt/anaconda3/bin/python3
+Creating virtual environment at: .venv
+Activate with: source .venv/bin/activate
+Resolved 151 packages in 5.72s
+Prepared 5 packages in 2.68s
+Installed 151 packages in 1.53s
+ + absl-py==2.5.0
+ + alembic==1.18.5
+ + anyio==4.14.2
+ + appnope==0.1.4
+ + argon2-cffi==25.1.0
+ + argon2-cffi-bindings==25.1.0
+ + arrow==1.4.0
+ + asttokens==3.0.2
+ + astunparse==1.6.3
+ + async-lru==2.3.0
+ + attrs==26.1.0
+ + babel==2.18.0
+ + beautifulsoup4==4.15.0
+ + bleach==6.4.0
+ + catboost==1.2.10
+ + certifi==2026.7.22
+ + cffi==2.1.0
+ + charset-normalizer==3.4.9
+ + colorlog==6.12.0
+ + comm==0.2.3
+ + contourpy==1.3.3
+ + cryptography==49.0.0
+ + cycler==0.12.1
+ + debugpy==1.8.21
+ + decorator==5.3.1
+ + defusedxml==0.7.1
+ + executing==2.2.1
+ + fastjsonschema==2.22.1
+ + flatbuffers==25.12.19
+ + fonttools==4.63.0
+ + fqdn==1.5.1
+ + gast==0.7.0
+ + google-pasta==0.2.0
+ + graphviz==0.21
+ + grpcio==1.83.0
+ + h11==0.16.0
+ + h5py==3.14.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + idna==3.18
+ + ipykernel==7.3.0
+ + ipython==9.15.0
+ + ipython-pygments-lexers==1.1.1
+ + ipywidgets==8.1.8
+ + isoduration==20.11.0
+ + jedi==0.20.0
+ + jinja2==3.1.6
+ + joblib==1.5.3
+ + json5==0.15.0
+ + jsonpointer==3.1.1
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ + jupyter==1.1.1
+ + jupyter-builder==1.1.1
+ + jupyter-client==8.9.1
+ + jupyter-console==6.6.3
+ + jupyter-core==5.9.1
+ + jupyter-events==0.12.1
+ + jupyter-lsp==2.3.1
+ + jupyter-server==2.20.0
+ + jupyter-server-terminals==0.5.4
+ + jupyterlab==4.6.2
+ + jupyterlab-pygments==0.3.0
+ + jupyterlab-server==2.28.0
+ + jupyterlab-widgets==3.0.16
+ + keras==3.15.0
+ + kiwisolver==1.5.0
+ + lark==1.3.1
+ + libclang==18.1.1
+ + mako==1.3.12
+ + markdown-it-py==4.2.0
+ + markupsafe==3.0.3
+ + matplotlib==3.11.1
+ + matplotlib-inline==0.2.2
+ + mdurl==0.1.2
+ + mistune==3.3.4
+ + ml-dtypes==0.5.4
+ + namex==0.1.0
+ + narwhals==2.24.0
+ + nbclient==0.11.0
+ + nbconvert==7.17.1
+ + nbformat==5.10.4
+ + nest-asyncio2==1.7.2
+ + notebook==7.6.1
+ + notebook-shim==0.2.4
+ + numpy==2.5.1
+ + opt-einsum==3.4.0
+ + optree==0.19.1
+ + optuna==4.9.0
+ + packaging==26.2
+ + pandas==3.0.5
+ + pandocfilters==1.5.1
+ + parso==0.8.7
+ + patsy==1.0.2
+ + pdfminer-six==20260107
+ + pdfplumber==0.11.10
+ + pexpect==4.9.0
+ + pillow==12.3.0
+ + platformdirs==4.11.0
+ + plotly==6.9.0
+ + prometheus-client==0.26.0
+ + prompt-toolkit==3.0.53
+ + protobuf==7.35.1
+ + psutil==7.2.2
+ + ptyprocess==0.7.0
+ + pure-eval==0.2.3
+ + pycparser==3.0
+ + pygments==2.20.0
+ + pyparsing==3.3.2
+ + pypdfium2==5.12.1
+ + python-dateutil==2.9.0.post0
+ + python-json-logger==4.1.0
+ + pyyaml==6.0.3
+ + pyzmq==27.1.0
+ + referencing==0.37.0
+ + requests==2.34.2
+ + rfc3339-validator==0.1.4
+ + rfc3986-validator==0.1.1
+ + rfc3987-syntax==1.1.0
+ + rich==15.0.0
+ + rpds-py==2026.6.3
+ + scikit-learn==1.9.0
+ + scipy==1.18.0
+ + seaborn==0.13.2
+ + send2trash==2.1.0
+ + setuptools==83.0.0
+ + six==1.17.0
+ + soupsieve==2.9.1
+ + sqlalchemy==2.0.51
+ + stack-data==0.6.3
+ + statsmodels==0.14.6
+ + tensorflow==2.21.0
+ + termcolor==3.3.0
+ + terminado==0.18.1
+ + threadpoolctl==3.6.0
+ + tinycss2==1.5.1
+ + tornado==6.5.7
+ + tqdm==4.70.0
+ + traitlets==5.15.1
+ + typing-extensions==4.16.0
+ + tzdata==2026.3
+ + uri-template==1.3.0
+ + urllib3==2.7.0
+ + wcwidth==0.8.2
+ + webcolors==25.10.0
+ + webencodings==0.5.1
+ + websocket-client==1.9.0
+ + wheel==0.47.0
+ + widgetsnbextension==4.0.15
+ + wrapt==2.3.0
+ + xgboost==3.3.0
+=== [20260729T231817] Data collecting ===
+
+checked=0 fetched=0 accepted_rows=0 rejected_rows=0 skipped_empty=0 errors=0
+{'checked_weeks': 0, 'accepted_rows': 0, 'rejected_rows': 0, 'message': 'already up to date'}
+[1/25] Fetching Colombo (6.9271, 79.8612) -> 2014-01-01..2026-07-28
+[2/25] Fetching Gampaha (7.0917, 80.0) -> 2014-01-01..2026-07-28
+[3/25] Fetching Kalutara (6.5854, 79.9607) -> 2014-01-01..2026-07-28
+[4/25] Fetching Kandy (7.2906, 80.6337) -> 2014-01-01..2026-07-28
+[5/25] Fetching Matale (7.4675, 80.6234) -> 2014-01-01..2026-07-28
+[6/25] Fetching Nuwara Eliya (6.9497, 80.7891) -> 2014-01-01..2026-07-28
+[7/25] Fetching Galle (6.0535, 80.221) -> 2014-01-01..2026-07-28
+[8/25] Fetching Matara (5.9549, 80.555) -> 2014-01-01..2026-07-28
+[9/25] Fetching Hambantota (6.1241, 81.1185) -> 2014-01-01..2026-07-28
+[10/25] Fetching Jaffna (9.6615, 80.0255) -> 2014-01-01..2026-07-28
+[11/25] Fetching Kilinochchi (9.3961, 80.4022) -> 2014-01-01..2026-07-28
+  rate limited, waiting 5s (attempt 1/5)
+  rate limited, waiting 10s (attempt 2/5)
+[12/25] Fetching Mannar (8.981, 79.9044) -> 2014-01-01..2026-07-28
+[13/25] Fetching Vavuniya (8.7514, 80.4971) -> 2014-01-01..2026-07-28
+[14/25] Fetching Mullaitivu (9.267, 80.8142) -> 2014-01-01..2026-07-28
+[15/25] Fetching Batticaloa (7.717, 81.7) -> 2014-01-01..2026-07-28
+[16/25] Fetching Ampara (7.2975, 81.6747) -> 2014-01-01..2026-07-28
+[17/25] Fetching Trincomalee (8.5874, 81.2152) -> 2014-01-01..2026-07-28
+[18/25] Fetching Kurunegala (7.4863, 80.3623) -> 2014-01-01..2026-07-28
+[19/25] Fetching Puttalam (8.0362, 79.8283) -> 2014-01-01..2026-07-28
+[20/25] Fetching Anuradhapura (8.3114, 80.4037) -> 2014-01-01..2026-07-28
+[21/25] Fetching Polonnaruwa (7.9403, 81.0188) -> 2014-01-01..2026-07-28
+[22/25] Fetching Badulla (6.9934, 81.055) -> 2014-01-01..2026-07-28
+[23/25] Fetching Monaragala (6.8726, 81.351) -> 2014-01-01..2026-07-28
+[24/25] Fetching Ratnapura (6.6828, 80.4012) -> 2014-01-01..2026-07-28
+[25/25] Fetching Kegalle (7.2513, 80.3464) -> 2014-01-01..2026-07-28
+Saved 16425 rows (25 districts) to /Users/chameera/Desktop/projects/Research-Project/data/raw/weather/weather.csv
+=== [20260729T231817] Data quality audit ===
+
+=== prices (data/raw/vegetable_prices/vegetable_prices.csv) ===
+  8184 rows, 2000-01-03 to 2026-06-22
+  [BRINJALS] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [CABBAGE] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [CARROT] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [LEEKS] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [PUMPKIN] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [SNAKE GOURD] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  wholesale_price: 26 flagged row(s):
+    [BRINJALS] 2010-04-12: wholesale_price=38.0 — week-over-week change 179% > 150%
+    [BRINJALS] 2012-02-27: wholesale_price=22.5 — week-over-week change 154% > 150%
+    [BRINJALS] 2013-12-23: wholesale_price=64.0 — week-over-week change 161% > 150%
+    [BRINJALS] 2017-03-06: wholesale_price=181.428571428571 — week-over-week change 230% > 150%
+    [BRINJALS] 2018-01-01: wholesale_price=211.5384615 — week-over-week change 173% > 150%
+    [BRINJALS] 2025-04-07: wholesale_price=575.0 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2018-01-01: wholesale_price=75.83333333 — week-over-week change 762% > 150%
+    [CABBAGE] 2024-01-01: wholesale_price=440.0 — z-score 5.2 beyond +/-5.0
+    [CABBAGE] 2024-01-15: wholesale_price=553.0 — z-score 6.7 beyond +/-5.0
+    [CABBAGE] 2024-01-22: wholesale_price=451.0 — z-score 5.3 beyond +/-5.0
+  retail_price: 9 flagged row(s):
+    [BRINJALS] 2024-01-15: retail_price=825.1724137931035 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2024-01-01: retail_price=698.4615384615385 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2024-01-15: retail_price=854.3333333333334 — z-score 6.5 beyond +/-5.0
+    [CABBAGE] 2024-01-22: retail_price=732.5 — z-score 5.4 beyond +/-5.0
+    [CABBAGE] 2024-01-29: retail_price=734.1379310344828 — z-score 5.4 beyond +/-5.0
+    [CARROT] 2024-01-15: retail_price=1703.3333333333333 — z-score 9.9 beyond +/-5.0
+    [CARROT] 2024-01-22: retail_price=1233.3333333333333 — z-score 6.9 beyond +/-5.0
+    [CARROT] 2024-01-29: retail_price=1537.037037037037 — z-score 8.8 beyond +/-5.0
+    [CARROT] 2024-02-05: retail_price=1150.0 — z-score 6.3 beyond +/-5.0
+
+=== fuel (data/raw/fuel/fuel_data_weekly.csv) ===
+  604 rows, 2015-01-05 to 2026-07-27
+  missing weeks: none
+  diesel_price: no flagged rows
+
+=== weather (data/raw/weather/weather.csv) ===
+  16425 rows, 2013-12-30 to 2026-07-27
+  no missing weeks (per group)
+  average_temperature: no flagged rows
+  average_rainfall: 80 flagged row(s):
+    [Ampara] 2014-12-22: average_rainfall=53.51 — z-score 8.0 beyond +/-5.0
+    [Anuradhapura] 2024-11-25: average_rainfall=46.0 — z-score 6.8 beyond +/-5.0
+    [Anuradhapura] 2025-11-24: average_rainfall=82.83 — z-score 12.8 beyond +/-5.0
+    [Badulla] 2014-12-22: average_rainfall=51.0 — z-score 5.8 beyond +/-5.0
+    [Badulla] 2019-12-09: average_rainfall=45.96 — z-score 5.1 beyond +/-5.0
+    [Badulla] 2020-12-21: average_rainfall=51.26 — z-score 5.8 beyond +/-5.0
+    [Badulla] 2025-11-24: average_rainfall=73.24 — z-score 8.6 beyond +/-5.0
+    [Batticaloa] 2014-12-15: average_rainfall=39.67 — z-score 5.7 beyond +/-5.0
+    [Batticaloa] 2014-12-22: average_rainfall=60.61 — z-score 9.1 beyond +/-5.0
+    [Batticaloa] 2024-11-25: average_rainfall=41.26 — z-score 6.0 beyond +/-5.0
+=== [20260729T231817] Build processed datasets ===
+carrot: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/carrot.csv
+brinjal: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/brinjal.csv
+pumpkin: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/pumpkin.csv
+cabbage: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/cabbage.csv
+snake_gourd: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/snake_gourd.csv
+leeks: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/leeks.csv
+=== [20260729T231817] Train all model families ===
+WARNING:tensorflow:5 out of the last 7 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x326cead40> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+WARNING:tensorflow:6 out of the last 9 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x326cead40> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+
+=== sarimax ===
+carrot/sarimax: holdout RMSE=245.70 MAPE=57.90% R2=-1.629 interval_coverage=0.96 (nominal 0.80)
+brinjal/sarimax: holdout RMSE=124.17 MAPE=21.25% R2=-0.146 interval_coverage=0.63 (nominal 0.80)
+pumpkin/sarimax: holdout RMSE=57.51 MAPE=25.28% R2=-0.247 interval_coverage=0.94 (nominal 0.80)
+cabbage/sarimax: holdout RMSE=110.83 MAPE=33.28% R2=-0.469 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/sarimax: holdout RMSE=108.25 MAPE=21.45% R2=-0.354 interval_coverage=0.52 (nominal 0.80)
+leeks/sarimax: holdout RMSE=95.73 MAPE=16.57% R2=-0.467 interval_coverage=0.77 (nominal 0.80)
+sarimax done in 129.0s
+
+=== random_forest ===
+carrot/random_forest: holdout RMSE=100.94 MAPE=13.42% R2=0.556 interval_coverage=0.54 (nominal 0.80)
+brinjal/random_forest: holdout RMSE=90.74 MAPE=14.61% R2=0.388 interval_coverage=0.56 (nominal 0.80)
+pumpkin/random_forest: holdout RMSE=22.80 MAPE=7.30% R2=0.804 interval_coverage=0.81 (nominal 0.80)
+cabbage/random_forest: holdout RMSE=48.24 MAPE=9.74% R2=0.722 interval_coverage=0.73 (nominal 0.80)
+snake_gourd/random_forest: holdout RMSE=62.55 MAPE=9.50% R2=0.548 interval_coverage=0.65 (nominal 0.80)
+leeks/random_forest: holdout RMSE=50.28 MAPE=8.20% R2=0.595 interval_coverage=0.65 (nominal 0.80)
+random_forest done in 9.5s
+
+=== xgboost ===
+carrot/xgboost: holdout RMSE=108.23 MAPE=14.43% R2=0.490 interval_coverage=0.63 (nominal 0.80)
+brinjal/xgboost: holdout RMSE=100.46 MAPE=15.14% R2=0.250 interval_coverage=0.69 (nominal 0.80)
+pumpkin/xgboost: holdout RMSE=23.25 MAPE=7.34% R2=0.796 interval_coverage=0.85 (nominal 0.80)
+cabbage/xgboost: holdout RMSE=49.90 MAPE=9.56% R2=0.702 interval_coverage=0.85 (nominal 0.80)
+snake_gourd/xgboost: holdout RMSE=72.75 MAPE=10.47% R2=0.389 interval_coverage=0.69 (nominal 0.80)
+leeks/xgboost: holdout RMSE=51.80 MAPE=8.59% R2=0.571 interval_coverage=0.75 (nominal 0.80)
+xgboost done in 24.0s
+
+=== catboost ===
+carrot/catboost: holdout RMSE=112.72 MAPE=13.91% R2=0.447 interval_coverage=0.67 (nominal 0.80)
+brinjal/catboost: holdout RMSE=97.95 MAPE=15.68% R2=0.287 interval_coverage=0.67 (nominal 0.80)
+pumpkin/catboost: holdout RMSE=26.82 MAPE=8.27% R2=0.729 interval_coverage=0.81 (nominal 0.80)
+cabbage/catboost: holdout RMSE=61.97 MAPE=11.00% R2=0.541 interval_coverage=0.85 (nominal 0.80)
+snake_gourd/catboost: holdout RMSE=71.49 MAPE=10.76% R2=0.410 interval_coverage=0.65 (nominal 0.80)
+leeks/catboost: holdout RMSE=48.49 MAPE=8.40% R2=0.624 interval_coverage=0.77 (nominal 0.80)
+catboost done in 19.8s
+
+=== hybrid_xgboost_sarimax ===
+carrot/hybrid_xgboost_sarimax: holdout RMSE=254.60 MAPE=59.61% R2=-1.823 interval_coverage=0.85 (nominal 0.80)
+brinjal/hybrid_xgboost_sarimax: holdout RMSE=128.30 MAPE=21.22% R2=-0.223 interval_coverage=0.69 (nominal 0.80)
+pumpkin/hybrid_xgboost_sarimax: holdout RMSE=59.34 MAPE=25.56% R2=-0.327 interval_coverage=0.90 (nominal 0.80)
+cabbage/hybrid_xgboost_sarimax: holdout RMSE=116.83 MAPE=35.04% R2=-0.632 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_xgboost_sarimax: holdout RMSE=123.07 MAPE=23.66% R2=-0.750 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_xgboost_sarimax: holdout RMSE=98.66 MAPE=17.53% R2=-0.558 interval_coverage=0.75 (nominal 0.80)
+hybrid_xgboost_sarimax done in 156.2s
+
+=== hybrid_catboost_sarimax ===
+carrot/hybrid_catboost_sarimax: holdout RMSE=243.94 MAPE=57.41% R2=-1.591 interval_coverage=0.92 (nominal 0.80)
+brinjal/hybrid_catboost_sarimax: holdout RMSE=131.45 MAPE=21.55% R2=-0.284 interval_coverage=0.62 (nominal 0.80)
+pumpkin/hybrid_catboost_sarimax: holdout RMSE=58.75 MAPE=25.43% R2=-0.301 interval_coverage=0.94 (nominal 0.80)
+cabbage/hybrid_catboost_sarimax: holdout RMSE=115.10 MAPE=34.33% R2=-0.584 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_catboost_sarimax: holdout RMSE=120.11 MAPE=22.74% R2=-0.667 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_catboost_sarimax: holdout RMSE=95.42 MAPE=16.94% R2=-0.457 interval_coverage=0.77 (nominal 0.80)
+hybrid_catboost_sarimax done in 151.2s
+
+=== hybrid_random_forest_sarimax ===
+carrot/hybrid_random_forest_sarimax: holdout RMSE=249.88 MAPE=58.71% R2=-1.719 interval_coverage=0.85 (nominal 0.80)
+brinjal/hybrid_random_forest_sarimax: holdout RMSE=128.70 MAPE=20.51% R2=-0.231 interval_coverage=0.65 (nominal 0.80)
+pumpkin/hybrid_random_forest_sarimax: holdout RMSE=58.86 MAPE=25.64% R2=-0.306 interval_coverage=0.94 (nominal 0.80)
+cabbage/hybrid_random_forest_sarimax: holdout RMSE=114.32 MAPE=34.31% R2=-0.563 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_random_forest_sarimax: holdout RMSE=122.05 MAPE=23.30% R2=-0.721 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_random_forest_sarimax: holdout RMSE=95.45 MAPE=17.23% R2=-0.458 interval_coverage=0.77 (nominal 0.80)
+hybrid_random_forest_sarimax done in 142.5s
+
+=== hybrid_lstm_sarimax ===
+carrot/hybrid_lstm_sarimax: holdout RMSE=415.17 MAPE=98.01% R2=-6.506 interval_coverage=0.46 (nominal 0.80)
+brinjal/hybrid_lstm_sarimax: holdout RMSE=228.70 MAPE=42.90% R2=-2.886 interval_coverage=0.35 (nominal 0.80)
+pumpkin/hybrid_lstm_sarimax: holdout RMSE=109.34 MAPE=49.01% R2=-3.506 interval_coverage=0.88 (nominal 0.80)
+cabbage/hybrid_lstm_sarimax: holdout RMSE=187.91 MAPE=56.85% R2=-3.223 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_lstm_sarimax: holdout RMSE=174.41 MAPE=38.22% R2=-2.514 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_lstm_sarimax: holdout RMSE=157.65 MAPE=36.18% R2=-2.978 interval_coverage=0.69 (nominal 0.80)
+hybrid_lstm_sarimax done in 628.5s
+
+=== lstm ===
+carrot/lstm: holdout RMSE=170.00 MAPE=24.63% R2=-0.258 interval_coverage=0.63 (nominal 0.80)
+brinjal/lstm: holdout RMSE=127.05 MAPE=22.63% R2=-0.199 interval_coverage=0.75 (nominal 0.80)
+pumpkin/lstm: holdout RMSE=60.74 MAPE=20.01% R2=-0.391 interval_coverage=0.65 (nominal 0.80)
+cabbage/lstm: holdout RMSE=101.61 MAPE=23.64% R2=-0.235 interval_coverage=0.79 (nominal 0.80)
+snake_gourd/lstm: holdout RMSE=97.73 MAPE=16.84% R2=-0.103 interval_coverage=0.63 (nominal 0.80)
+leeks/lstm: holdout RMSE=62.16 MAPE=12.79% R2=0.382 interval_coverage=0.88 (nominal 0.80)
+lstm done in 327.4s
+
+Saved 54 rows to /Users/chameera/Desktop/projects/Research-Project/results/metrics/all_results.csv
+Saved 2808 holdout prediction rows to /Users/chameera/Desktop/projects/Research-Project/results/metrics/holdout_predictions.csv
+Saved comparison table to /Users/chameera/Desktop/projects/Research-Project/results/tables/model_comparison.csv
+
+RMSE by vegetable x model (lower is better):
+model        catboost  hybrid_catboost_sarimax  hybrid_lstm_sarimax  hybrid_random_forest_sarimax  hybrid_xgboost_sarimax   lstm  random_forest  sarimax  xgboost
+vegetable                                                                                                                                                        
+brinjal          97.9                    131.4                228.7                         128.7                   128.3  127.1           90.7    124.2    100.5
+cabbage          62.0                    115.1                187.9                         114.3                   116.8  101.6           48.2    110.8     49.9
+carrot          112.7                    243.9                415.2                         249.9                   254.6  170.0          100.9    245.7    108.2
+leeks            48.5                     95.4                157.6                          95.4                    98.7   62.2           50.3     95.7     51.8
+pumpkin          26.8                     58.7                109.3                          58.9                    59.3   60.7           22.8     57.5     23.3
+snake_gourd      71.5                    120.1                174.4                         122.0                   123.1   97.7           62.5    108.3     72.7
+=== [20260729T231817] Genuine future forecast ===
+carrot/sarimax... 9 weeks, predicted range [439.9, 468.3]
+carrot/random_forest... 9 weeks, predicted range [401.9, 476.2]
+carrot/xgboost... 9 weeks, predicted range [373.9, 489.2]
+carrot/catboost... 9 weeks, predicted range [382.3, 482.0]
+carrot/hybrid_xgboost_sarimax... 9 weeks, predicted range [391.9, 463.9]
+carrot/hybrid_catboost_sarimax... 9 weeks, predicted range [417.5, 460.4]
+carrot/hybrid_random_forest_sarimax... 9 weeks, predicted range [426.9, 456.0]
+carrot/hybrid_lstm_sarimax... 9 weeks, predicted range [408.9, 461.7]
+carrot/lstm... 9 weeks, predicted range [275.7, 498.5]
+brinjal/sarimax... 9 weeks, predicted range [314.6, 424.9]
+brinjal/random_forest... 9 weeks, predicted range [331.4, 432.0]
+brinjal/xgboost... 9 weeks, predicted range [322.8, 451.4]
+brinjal/catboost... 9 weeks, predicted range [298.3, 423.0]
+brinjal/hybrid_xgboost_sarimax... 9 weeks, predicted range [279.0, 427.2]
+brinjal/hybrid_catboost_sarimax... 9 weeks, predicted range [302.3, 432.0]
+brinjal/hybrid_random_forest_sarimax... 9 weeks, predicted range [302.0, 428.5]
+brinjal/hybrid_lstm_sarimax... 9 weeks, predicted range [289.5, 394.0]
+brinjal/lstm... 9 weeks, predicted range [293.8, 410.1]
+pumpkin/sarimax... 9 weeks, predicted range [227.8, 257.5]
+pumpkin/random_forest... 9 weeks, predicted range [196.4, 201.1]
+pumpkin/xgboost... 9 weeks, predicted range [152.6, 189.1]
+pumpkin/catboost... 9 weeks, predicted range [164.3, 197.9]
+pumpkin/hybrid_xgboost_sarimax... 9 weeks, predicted range [223.4, 260.4]
+pumpkin/hybrid_catboost_sarimax... 9 weeks, predicted range [233.7, 259.6]
+pumpkin/hybrid_random_forest_sarimax... 9 weeks, predicted range [229.3, 258.3]
+pumpkin/hybrid_lstm_sarimax... 9 weeks, predicted range [239.7, 279.5]
+pumpkin/lstm... 9 weeks, predicted range [256.3, 305.6]
+cabbage/sarimax... 9 weeks, predicted range [281.6, 290.8]
+cabbage/random_forest... 9 weeks, predicted range [286.0, 299.2]
+cabbage/xgboost... 9 weeks, predicted range [268.5, 306.6]
+cabbage/catboost... 9 weeks, predicted range [289.5, 358.8]
+cabbage/hybrid_xgboost_sarimax... 9 weeks, predicted range [282.6, 304.9]
+cabbage/hybrid_catboost_sarimax... 9 weeks, predicted range [282.6, 305.5]
+cabbage/hybrid_random_forest_sarimax... 9 weeks, predicted range [289.4, 301.2]
+cabbage/hybrid_lstm_sarimax... 9 weeks, predicted range [261.4, 314.1]
+cabbage/lstm... 9 weeks, predicted range [238.7, 311.3]
+snake_gourd/sarimax... 9 weeks, predicted range [589.7, 638.8]
+snake_gourd/random_forest... 9 weeks, predicted range [381.8, 405.9]
+snake_gourd/xgboost... 9 weeks, predicted range [307.8, 384.9]
+snake_gourd/catboost... 9 weeks, predicted range [343.1, 373.7]
+snake_gourd/hybrid_xgboost_sarimax... 9 weeks, predicted range [583.3, 623.5]
+snake_gourd/hybrid_catboost_sarimax... 9 weeks, predicted range [528.1, 605.0]
+snake_gourd/hybrid_random_forest_sarimax... 9 weeks, predicted range [563.5, 621.1]
+snake_gourd/hybrid_lstm_sarimax... 9 weeks, predicted range [535.4, 633.0]
+snake_gourd/lstm... 9 weeks, predicted range [454.2, 585.4]
+leeks/sarimax... 9 weeks, predicted range [414.2, 425.2]
+leeks/random_forest... 9 weeks, predicted range [323.8, 418.3]
+leeks/xgboost... 9 weeks, predicted range [318.7, 412.5]
+leeks/catboost... 9 weeks, predicted range [313.7, 422.5]
+leeks/hybrid_xgboost_sarimax... 9 weeks, predicted range [377.4, 413.0]
+leeks/hybrid_catboost_sarimax... 9 weeks, predicted range [383.3, 415.5]
+leeks/hybrid_random_forest_sarimax... 9 weeks, predicted range [387.3, 406.5]
+leeks/hybrid_lstm_sarimax... 9 weeks, predicted range [391.0, 425.2]
+leeks/lstm... 9 weeks, predicted range [314.0, 471.4]
+
+Saved 486 rows to /Users/chameera/Desktop/projects/Research-Project/results/metrics/future_predictions.csv
+=== [20260729T231817] Seed backend (Postgres + Redis) ===
+Invalidated Redis cache for 6 vegetables (plus unfiltered list caches)
+historical_price: 3498 rows upserted
+forecast: 3294 rows upserted
+model_metric: 54 rows upserted
+=== [20260729T231817] Done ===

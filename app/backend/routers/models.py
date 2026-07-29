@@ -28,7 +28,7 @@ async def list_models(
     vegetable: str | None = Query(
         default=None,
         description="Filter to a single vegetable (see `GET /vegetables` for valid values). Omit "
-        "to return all 42 rows (6 vegetables × 7 model families).",
+        "to return all 54 rows (6 vegetables × 9 model families).",
         examples=["carrot"],
     ),
     session: AsyncSession = Depends(get_db),

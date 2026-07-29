@@ -1,0 +1,49 @@
+name: Train and Deploy
+
+# Runs on a GitHub-hosted runner, which has no access to data/raw/ (gitignored,
+# lives only on the EC2 box). So this workflow doesn't train locally — it
+# syncs the repo's tracked files to EC2 over SSH, then runs deploy/train.sh,
+# deploy/deploy.sh, and deploy/seed.sh *on the instance itself*, where the
+# data and both .venvs already live (see deploy/setup-ec2.md for the one-time
+# setup). `git archive | ssh ... tar -x` only writes the archive's own
+# entries, so gitignored dirs (data/raw/, trained_models/, results/, .venv/)
+# on the box are left untouched by the sync.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: vegepredict-deploy
+  cancel-in-progress: false
+
+jobs:
+  train-build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync tracked repo files to EC2
+        run: |
+          git archive --format=tar HEAD | \
+            ssh -i ~/.ssh/deploy_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+              'tar -x -C ~/Research-Project'
+
+      - name: Train, build, deploy, and seed on the instance
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+            set -euo pipefail
+            cd ~/Research-Project
+            chmod +x deploy/*.sh
+            deploy/train.sh
+            SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh
+            deploy/seed.sh
+          '

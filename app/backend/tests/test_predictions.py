@@ -96,6 +96,49 @@ async def test_list_predictions_negative_offset_rejected(client):
     assert resp.status_code == 422
 
 
+async def test_future_predictions_best(client):
+    resp = await client.get("/predictions/carrot/future", params={"model": "best"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) > 0
+    assert all(row["vegetable"] == "carrot" for row in body)
+    assert all(row["model_family"] == "random_forest" for row in body)
+    assert all(row["actual_price"] is None for row in body)
+
+
+async def test_future_predictions_are_chronological(client):
+    resp = await client.get("/predictions/carrot/future", params={"model": "best"})
+    assert resp.status_code == 200
+    dates = [row["forecast_date"] for row in resp.json()]
+    assert dates == sorted(dates)
+
+
+async def test_future_predictions_have_sane_interval(client):
+    resp = await client.get("/predictions/carrot/future", params={"model": "best"})
+    assert resp.status_code == 200
+    for row in resp.json():
+        assert row["predicted_lower"] <= row["predicted_price"] <= row["predicted_upper"]
+
+
+async def test_future_predictions_specific_model(client):
+    resp = await client.get("/predictions/carrot/future", params={"model": "sarimax"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) > 0
+    assert all(row["model_family"] == "sarimax" for row in body)
+
+
+async def test_future_predictions_unknown_vegetable(client):
+    resp = await client.get("/predictions/durian/future")
+    assert resp.status_code == 404
+
+
+async def test_future_predictions_unknown_model_returns_empty_not_error(client):
+    resp = await client.get("/predictions/carrot/future", params={"model": "not_a_real_model"})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 async def test_best_model_matches_lowest_rmse_in_models_endpoint(client):
     models_resp = await client.get("/models", params={"vegetable": "brinjal"})
     assert models_resp.status_code == 200

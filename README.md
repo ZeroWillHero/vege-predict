@@ -2,7 +2,7 @@
 
 Adaptive, trustworthy vegetable price forecasting for Sri Lanka — UWU ICT 481-6 capstone project.
 
-Fuses historical retail prices, weather, and fuel price data to forecast short-term prices for **carrot, brinjal, pumpkin, cabbage, snake gourd, and leeks**, using seven model families (SARIMAX, LSTM, Random Forest, XGBoost, CatBoost, and two SARIMAX-residual hybrids). Every forecast ships with an 80% prediction interval, not just a point estimate. A FastAPI backend (Postgres + Redis) serves the results.
+Fuses historical retail prices, weather, and fuel price data to forecast short-term prices for **carrot, brinjal, pumpkin, cabbage, snake gourd, and leeks**, using nine model families (SARIMAX, LSTM, Random Forest, XGBoost, CatBoost, and four SARIMAX-residual hybrids — XGBoost, CatBoost, Random Forest, and LSTM). Every forecast ships with an 80% prediction interval, not just a point estimate. A FastAPI backend (Postgres + Redis) serves the results.
 
 For full architecture notes, gotchas, and research context, see [CLAUDE.md](CLAUDE.md) — this README only covers how to run things.
 
@@ -29,13 +29,18 @@ uv pip install -r requirements.txt --python .venv/bin/python
 #    after raw data changes — see scripts/ below for how to refresh raw data)
 python src/data_processing/build_dataset.py --vegetable carrot   # repeat per vegetable, or omit --vegetable for all
 
-# 2. Train every model family for every vegetable in one go (~7 minutes+, SARIMAX/LSTM
-#    are the slow parts). Writes results/metrics/all_results.csv,
+# 2. Train every model family for every vegetable in one go (~15 minutes+, SARIMAX/LSTM
+#    and their hybrids are the slow parts). Writes results/metrics/all_results.csv,
 #    results/metrics/holdout_predictions.csv, and results/tables/model_comparison.csv
 python scripts/train_all.py
 
 # Or train a single model family for a single vegetable during development:
 python src/models/random_forest/train.py --vegetable carrot
+
+# 3. Genuine future forecast (next N weeks past the last known price date, all 9 model
+#    families) — requires trained_models/ artifacts from step 2 above. Writes
+#    results/metrics/future_predictions.csv
+python scripts/predict_future.py
 ```
 
 ### Refreshing raw data (optional)
@@ -86,8 +91,8 @@ A local Postgres instance (database `vegepredict`) and Redis instance, both reac
 # 1. Apply schema migrations (only needed once, or after a schema change)
 app/backend/.venv/bin/python3 -m alembic -c app/backend/alembic.ini upgrade head
 
-# 2. Seed/refresh Postgres from the CSVs scripts/train_all.py produces — safe to
-#    re-run after every retrain (idempotent upsert)
+# 2. Seed/refresh Postgres from the CSVs scripts/train_all.py (and, if present,
+#    scripts/predict_future.py) produce — safe to re-run after every retrain (idempotent upsert)
 app/backend/.venv/bin/python3 app/backend/seed.py
 
 # 3. Start the API (run from the project root, so app.backend.* imports resolve)

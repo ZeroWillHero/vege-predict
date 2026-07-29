@@ -8,12 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Target vegetables: **carrot, brinjal, pumpkin, cabbage, snake gourd, leeks**.
 
-**Forecasting models** (proposal-mandated: SARIMA, LSTM, Random Forest, XGBoost, plus hybrids; CatBoost and its hybrid are an extended baseline beyond the proposal, kept from the original scaffold):
+**Forecasting models** (proposal-mandated: SARIMA, LSTM, Random Forest, XGBoost, plus hybrids; CatBoost and its hybrid are an extended baseline beyond the proposal, kept from the original scaffold; the SARIMAX+Random Forest and SARIMAX+LSTM hybrids were added afterward at supervisor request):
 - **SARIMAX** — linear/seasonal component, weather+fuel as exogenous regressors
 - **LSTM** — sequence model over price + exogenous history
 - **Random Forest** — lag/rolling/calendar features
 - **XGBoost**, **CatBoost** — same feature set as Random Forest
-- **Hybrid XGBoost+SARIMAX**, **Hybrid CatBoost+SARIMAX** — SARIMAX models the linear/seasonal component; the ML model is trained on SARIMAX's residuals; final forecast = SARIMAX prediction + residual prediction
+- **Hybrid XGBoost+SARIMAX**, **Hybrid CatBoost+SARIMAX**, **Hybrid Random Forest+SARIMAX**, **Hybrid LSTM+SARIMAX** — one shared design across all four: SARIMAX models the linear/seasonal component; the second model (XGBoost, CatBoost, Random Forest, or LSTM) is trained on SARIMAX's residuals; final forecast = SARIMAX prediction + residual prediction. The LSTM variant (`hybrid_lstm_sarimax`) reuses the plain LSTM's scaling/windowing code unchanged, just handing it a frame where `"target"` is the SARIMAX residual instead of price, and clips the residual to a bounded range before scaling — SARIMAX's out-of-sample forecast occasionally diverges on a small/early CV fold (a known SARIMAX fragility, see gotchas below), and the tree-based residual models tolerate that silently while the LSTM's float32 scaling path doesn't without the clip. See `research-papers/drafts/thesis/03_methodology.md` §3.10.6 for the full write-up.
 
 **Beyond forecasting**, the proposal's remaining objectives:
 - **Explainability** (`src/explainability/`) — SHAP feature attribution across models, so forecasts are transparent to farmers/traders, not a black box
@@ -24,7 +24,7 @@ Evaluation is via time-series cross-validation (walk-forward, `src.evaluation.me
 
 ## Project status
 
-**Phase: forecasting models — implemented and runnable end-to-end. Backend API (`app/backend/`) — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, the auto-retrain pipeline, and the prototype frontend UI are still deferred (scoped out of this phase deliberately, not forgotten).
+**Phase: forecasting models — implemented and runnable end-to-end. Backend API (`app/backend/`) — implemented and runnable end-to-end. Genuine future forecasting (`scripts/predict_future.py`) — implemented and runnable end-to-end.** SHAP explainability, LLM advisory, satellite/IoT/behavioral fusion, the auto-retrain pipeline, and the prototype frontend UI are still deferred (scoped out of this phase deliberately, not forgotten).
 
 Resolved decisions (were open questions earlier; now settled and reflected in code/config):
 - **Forecast target**: `retail_price` (not wholesale) — `forecasting.target_column` in config.
@@ -37,6 +37,17 @@ Resolved decisions (were open questions earlier; now settled and reflected in co
 Known technical gotchas (if touching `src/models/sarimax/`):
 - `simple_differencing=True` combined with `exog` breaks statsmodels' out-of-sample forecasting — it was tried for speed and produced forecasts that diverged to nonsensical values (confirmed empirically). Do not re-enable it without re-verifying holdout predictions stay in a sane range.
 - Never pickle a fitted `SARIMAXResultsWrapper` directly — with `seasonal_order` period 52, it balloons to ~320MB per artifact (the Kalman filter's full state/covariance history). Use `SarimaxArtifact` (`src/models/sarimax/train.py`) instead: it stores just `params` + a small history frame and reconstructs via `.filter(params)`, at ~20KB with byte-identical forecasts. `HybridSarimaxResidualModel` (`src/models/hybrid_xgboost_sarimax/train.py`) already builds on this — don't regress it back to storing the raw results object.
+- SARIMAX's out-of-sample `.forecast()` can occasionally diverge to an extreme value on a small/early walk-forward CV fold (confirmed empirically: cabbage's second CV fold produced a forecast around 3.9e38 with the AIC-selected order) — the tree-based residual hybrids tolerate this silently (one bad-but-finite fold score), but `hybrid_lstm_sarimax` (`src/models/hybrid_lstm_sarimax/train.py`) casts the residual to float32 for scaling, and a value that large overflows to `inf`, which crashes `StandardScaler`. `HybridSarimaxLstmModel.resid_clip` (10× the in-sample residual std, computed at fit time) bounds this before scaling — don't remove it without re-verifying `scripts/train_all.py` runs clean across all 6 vegetables.
+- **Genuine future forecasting must call SARIMAX-based `.forecast()` exactly once per vegetable/family, covering the whole horizon in one call — never once per week.** `SarimaxArtifact.forecast(future_df)` reconstructs the filter from the original training data and calls `get_forecast(steps=len(future_df), ...)`; calling it repeatedly with a 1-row `future_df` would make every future week look like the very next week after training ends (a 1-step forecast), not N steps ahead — silently wrong, no error raised. `src/inference/future_forecast.py::recursive_forecast()` gets this right (confirmed by testing: its SARIMAX-family output matches a direct single multi-step `.forecast()` call exactly) — preserve this when touching that module.
+
+## Future forecasting (`scripts/predict_future.py`)
+
+Genuinely predicts `forecasting.future_horizon_weeks` weeks (default 4) past **today's real date**, for all 9 model families, reusing each family's already-persisted production artifact (`trained_models/<family>/<vegetable>.*` from `scripts/train_all.py` — no retraining). Implemented in `src/inference/future_forecast.py`:
+- **Horizon is anchored to today, not to the last known price date** — `build_future_exog()` computes `weeks_to_bridge = (today_week_start - last_known_date) // 7` and generates `weeks_to_bridge + future_horizon_weeks` total weeks. This matters because the price data can lag behind real time by a month or more (confirmed: at one point price data ended 2026-06-22 while today was 2026-07-29, a 5-week gap) — anchoring purely to the last known date would silently produce "future" weeks that are already in the past by the time anyone actually looks at them. The gap weeks are bridged automatically (recursive lag features can't skip them anyway) rather than skipped, so the response includes both the catch-up weeks and the genuinely-forward ones — don't "simplify" this back to a fixed offset from the last known date.
+- **Recursive one-step chaining**: each week's own prediction is fed back in as the next week's `price_lag_1`/etc. (via `_build_future_row()`, which replicates `feature_engineering.py`'s lag/rolling/calendar formulas exactly for a single new row — reusing the constants `LAG_WEEKS`/`ROLLING_WINDOWS`/`EXOG_COLUMNS` directly rather than duplicating them). SARIMAX-based families are the one exception — see the gotcha above.
+- **Future weather/diesel resolved in a three-tier cascade**, cheapest/most-accurate first, in `build_future_exog()`: (1) `data/raw/weather/weather.csv`/`fuel_data_weekly.csv` are refreshed independently of price data and are often already ahead of it — if a future week's real value is already sitting there, use it directly, no estimation at all; (2) Open-Meteo's real forecast endpoint (`scripts/fetch_weather_openmeteo.py::fetch_district_forecast()`, ~16 days out, fetched lazily/at most once — only called if tier 1 doesn't cover everything); (3) `climatology_estimate()` — that ISO week's historical average per district — for anything further out. Diesel price forward-fills the last known CPC revision if the horizon exceeds available fuel data (diesel only changes on periodic revisions, so this is usually accurate, not a guess). Deliberately not replaced with dedicated forecasting models for either: Open-Meteo's forecast is already better than anything an in-house model could produce from this project's own small weather archive, and diesel is a policy-driven step function with no learnable signal in its own price history alone (no forex/subsidy/global-oil-price inputs in this project's data) — carry-forward is the correct expectation between revisions, not a shortcut.
+- **Prediction interval uses holdout residuals, not CV-fold residuals** — `_holdout_interval()` derives the ± offset from `results/metrics/holdout_predictions.csv`'s already-persisted `actual - predicted` for that vegetable/family, via the same `prediction_interval()` function the backtest path uses. CV-fold residuals aren't persisted anywhere and recomputing them would mean re-running the full walk-forward CV — a deliberate, documented substitution, not an oversight.
+- Output: `results/metrics/future_predictions.csv`, same shape as `holdout_predictions.csv` minus `actual` (genuinely unknown). `app/backend/seed.py::seed_forecasts()` reads this file too (if present) and upserts into the same `forecast` table — `actual_price` ends up `NULL` for these rows (confirmed via the live API), not `NaN`, because of the `pd.isna()` guard added alongside this feature (a real pre-existing bug: `actual_price` used to be assigned straight from the CSV with no NaN check, unlike `predicted_lower`/`predicted_upper` a few lines above it — a future row's missing actual would have silently become Postgres `NaN` instead of `NULL`, breaking the "null for unresolved weeks" API contract before anything ever exercised that path). No Alembic migration was needed — `actual_price` was already nullable.
 
 ## Model selection criteria
 
@@ -48,20 +59,20 @@ Two different criteria are used deliberately, for two different questions:
 
 Environment: project uses an isolated `.venv` (not system/Anaconda Python) — see Setup below. Verified working on Apple Silicon (M4).
 
-**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order; holdout is always the most recent 52 weeks of whatever data exists, so it shifted forward to ~Jun 2025-Jun 2026 after the HARTI/CPC data update — not directly comparable to earlier snapshots of this table):
+**Latest full-grid results** (`results/tables/model_comparison.csv`, holdout RMSE, lower is better — regenerate with `python scripts/train_all.py`; SARIMAX-based columns use the AIC-selected per-vegetable order; holdout is always the most recent 52 weeks of whatever data exists, so it shifts forward as new data is ingested — not directly comparable to earlier snapshots of this table):
 
-| vegetable | catboost | random_forest | xgboost | lstm | sarimax | hybrid_xgb+sarimax | hybrid_cb+sarimax |
-|---|---|---|---|---|---|---|---|
-| carrot | 112.7 | **100.9** | 108.2 | 183.1 | 245.7 | 254.6 | 243.9 |
-| brinjal | 98.0 | **90.7** | 100.5 | 140.9 | 124.2 | 128.3 | 131.5 |
-| pumpkin | 26.8 | **22.8** | 23.3 | 68.1 | 57.5 | 59.3 | 58.7 |
-| cabbage | 62.0 | **48.2** | 49.9 | 118.5 | 110.8 | 116.8 | 115.1 |
-| snake_gourd | 71.5 | **62.5** | 72.7 | 99.4 | 108.3 | 123.1 | 120.1 |
-| leeks | **48.5** | 50.3 | 51.8 | 66.4 | 95.7 | 98.7 | 95.4 |
+| vegetable | catboost | random_forest | xgboost | lstm | sarimax | hybrid_xgb+sarimax | hybrid_cb+sarimax | hybrid_rf+sarimax | hybrid_lstm+sarimax |
+|---|---|---|---|---|---|---|---|---|---|
+| carrot | 112.7 | **100.9** | 108.2 | 216.2 | 245.7 | 254.6 | 243.9 | 249.9 | 469.5 |
+| brinjal | 98.0 | **90.7** | 100.5 | 149.8 | 124.2 | 128.3 | 131.4 | 128.7 | 213.9 |
+| pumpkin | 26.8 | **22.8** | 23.3 | 49.5 | 57.5 | 59.3 | 58.7 | 58.9 | 109.4 |
+| cabbage | 62.0 | **48.2** | 49.9 | 112.7 | 110.8 | 116.8 | 115.1 | 114.3 | 203.6 |
+| snake_gourd | 71.5 | **62.5** | 72.7 | 91.6 | 108.3 | 123.1 | 120.1 | 122.0 | 181.6 |
+| leeks | **48.5** | 50.3 | 51.8 | 68.6 | 95.7 | 98.7 | 95.4 | 95.4 | 159.6 |
 
-Random Forest now wins 5/6 vegetables (was more mixed with CatBoost before the data update); CatBoost still wins leeks narrowly. SARIMAX and both SARIMAX-hybrids remain the worst performers on every vegetable even with AIC-selected orders — still a genuine finding, not a bug: SARIMAX's own fit is poor on the (still volatile) holdout year, all its R² values are negative, and the hybrids inherit that error rather than correcting it. Don't read the model ranking numbers as fixed — they move with the holdout window, which moves with the data; re-run `scripts/train_all.py` after any data update and expect the table to shift. (LSTM's column also shifts slightly between identical re-runs on the same data — it's the only stochastic model in the grid, seeded by weight initialization; the other six are deterministic given the same input.)
+Random Forest wins 5/6 vegetables; CatBoost wins leeks narrowly. SARIMAX and all four SARIMAX-hybrids remain the worst performers on every vegetable even with AIC-selected orders — still a genuine finding, not a bug: SARIMAX's own fit is poor on the (still volatile) holdout year, all its R² values are negative, and the hybrids inherit that error rather than correcting it. The two new hybrids (`hybrid_random_forest_sarimax`, `hybrid_lstm_sarimax`, added at supervisor request) both confirm this pattern rather than escaping it. `hybrid_random_forest_sarimax` lands right alongside `hybrid_xgboost_sarimax`/`hybrid_catboost_sarimax` — all three tree-based residual correctors produce nearly identical, only-slightly-worse-than-plain-SARIMAX numbers, exactly as expected from the shared architecture. `hybrid_lstm_sarimax` is a more striking finding: it is the single worst model family in the entire grid on every vegetable, clearly worse than plain SARIMAX itself (e.g. carrot 469.5 vs. SARIMAX's own 245.7) — this was root-caused during development, not just observed: SARIMAX's out-of-sample forecast for the holdout year is heavily biased (nearly flat, failing to track the actual price swings), so the "residual" the LSTM is asked to correct has a training/test distribution shift far larger than what the tree-based residual models face; a scaled, autoregressive LSTM amplifies that shift instead of damping it the way a tree regressor's bounded predictions do. A residual-clipping safeguard (`HybridSarimaxLstmModel.resid_clip`) was added purely to keep training numerically stable (SARIMAX occasionally diverges to an extreme value on a small early CV fold, e.g. cabbage fold 2 — this crashed training before the clip was added), not to fix the underlying accuracy problem, which is architectural. See `research-papers/drafts/thesis/03_methodology.md` §3.10.6 for the full write-up. Don't read any of these model-ranking numbers as fixed — they move with the holdout window, which moves with the data; re-run `scripts/train_all.py` after any data update and expect the table to shift. (LSTM and `hybrid_lstm_sarimax` are the only stochastic model families in the grid, seeded by LSTM weight initialization; the other seven are deterministic given the same input.)
 
-**Forecast prediction rows** (`results/metrics/holdout_predictions.csv`, 2,184 = 6 vegetables × 7 models × 52 weeks) and **AIC order-search rows** (`results/tables/sarimax_order_selection.csv`, 54 = 6 vegetables × 9 candidate orders) should be regenerated together whenever the SARIMAX order changes — run `scripts/select_sarimax_order.py` first, update `order_by_vegetable` if orders shift, then `scripts/train_all.py`.
+**Forecast prediction rows** (`results/metrics/holdout_predictions.csv`, 2,808 = 6 vegetables × 9 models × 52 weeks) and **AIC order-search rows** (`results/tables/sarimax_order_selection.csv`, 54 = 6 vegetables × 9 candidate orders) should be regenerated together whenever the SARIMAX order changes — run `scripts/select_sarimax_order.py` first, update `order_by_vegetable` if orders shift, then `scripts/train_all.py`.
 
 Still open / deferred to a later phase: LLM provider for the advisory module; how satellite NDVI / IoT / behavioral survey data will actually be sourced (GEE auth, IoT data format, survey instrument); SHAP explainability implementation; prototype UI framework choice.
 
@@ -87,7 +98,8 @@ Still open / deferred to a later phase: LLM provider for the advisory module; ho
 - `GET /health` — DB + Redis connectivity check
 - `GET /vegetables` — the 6 target vegetables
 - `GET /models?vegetable=` — per-vegetable model comparison (MAE/RMSE/MAPE/R²), sorted by RMSE ascending
-- `GET /predictions/{vegetable}?model=best|<family>` — single latest forecast; `model=best` (default) resolves to the lowest-RMSE model family
+- `GET /predictions/{vegetable}?model=best|<family>` — single latest forecast; `model=best` (default) resolves to the lowest-RMSE model family. Selects purely by `forecast_date`, so this can return a genuinely future, unresolved row (`actual_price: null`) if one exists
+- `GET /predictions/{vegetable}/future?model=best|<family>` — every not-yet-resolved week (`actual_price IS NULL`) for a vegetable, oldest first — the dedicated way to read "the upcoming forecast" as a trajectory rather than filtering the general list endpoint. Empty list (not 404) if `scripts/predict_future.py` hasn't been run yet
 - `GET /predictions?vegetable=&model=&year=&limit=&offset=` — filtered/paginated forecast history
 - `GET /prices/{vegetable}/history?start_date=&end_date=&limit=&offset=` — historical prices
 
@@ -167,7 +179,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 
 **Hybrid models** (`src/models/hybrid_*`) depend on the plain SARIMAX fit: they load/re-fit SARIMAX first, compute residuals (actual − SARIMAX prediction), then train the ML model on those residuals plus the exogenous features. Final forecast = SARIMAX prediction + ML residual prediction. Keep this two-stage structure intact — don't collapse it into a single end-to-end model.
 
-**Per-vegetable, per-model artifacts:** every vegetable is modeled independently (no cross-vegetable pooling), and every model family is trained separately per vegetable. Expect `6 vegetables × 7 model families = 42` trained artifacts, plus corresponding metrics rows in `results/metrics/`.
+**Per-vegetable, per-model artifacts:** every vegetable is modeled independently (no cross-vegetable pooling), and every model family is trained separately per vegetable. Expect `6 vegetables × 9 model families = 54` trained artifacts, plus corresponding metrics rows in `results/metrics/`.
 
 **Evaluation:** `src/evaluation/metrics.py` is the single source of truth for MAE/RMSE/MAPE — all training scripts and notebooks should import from there rather than reimplementing metrics, so comparisons across model families stay apples-to-apples.
 
@@ -175,7 +187,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 
 **Calibration varies a lot by vegetable, and that's a real finding, not noise**: for each vegetable's *best* (lowest-RMSE) model, empirical coverage against the nominal 0.8 ranges from ~0.54 (carrot, brinjal — the interval is too narrow, understating uncertainty) to ~0.81 (pumpkin — well-calibrated). Random Forest, the winner on 5/6 vegetables, apparently has more volatile out-of-holdout errors than its CV-fold residuals suggest for the harder-to-forecast vegetables. Don't quote "80% interval" as if it's uniformly true — check `interval_coverage` per vegetable before making a calibration claim in the thesis.
 
-**Forecast verification:** `common.run_training` returns both the metrics dict and the holdout-period `(date, actual, predicted, predicted_lower, predicted_upper)` series; `scripts/train_all.py` concatenates the latter into `results/metrics/holdout_predictions.csv` (2,184 rows = 6 vegetables × 7 models × 52 holdout weeks). `notebooks/03_model_results.ipynb` plots these as forecast-vs-actual charts (and residuals), saved to `results/figures/forecast_vs_actual_*.png` — don't rely on RMSE/R² tables alone to sanity-check a model; look at the actual curve.
+**Forecast verification:** `common.run_training` returns both the metrics dict and the holdout-period `(date, actual, predicted, predicted_lower, predicted_upper)` series; `scripts/train_all.py` concatenates the latter into `results/metrics/holdout_predictions.csv` (2,808 rows = 6 vegetables × 9 models × 52 holdout weeks). `notebooks/03_model_results.ipynb` plots these as forecast-vs-actual charts (and residuals), saved to `results/figures/forecast_vs_actual_*.png` — don't rely on RMSE/R² tables alone to sanity-check a model; look at the actual curve.
 
 ## Folder layout
 
@@ -183,7 +195,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `data/processed/` — merged, per-vegetable model-ready datasets
 - `src/data_processing/` — raw → processed merging
 - `src/features/` — shared feature engineering used by all models
-- `src/models/{sarimax,lstm,random_forest,xgboost,catboost,hybrid_xgboost_sarimax,hybrid_catboost_sarimax}/` — one training module per model family
+- `src/models/{sarimax,lstm,random_forest,xgboost,catboost,hybrid_xgboost_sarimax,hybrid_catboost_sarimax,hybrid_random_forest_sarimax,hybrid_lstm_sarimax}/` — one training module per model family
 - `src/explainability/` — SHAP-based feature attribution, shared across model families
 - `src/advisory/` — LLM-based advisory message generation from forecast + explanation
 - `src/evaluation/` — shared metrics and cross-model comparison
@@ -192,7 +204,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `app/` — prototype forecast + explanation + advisory interface (web/mobile)
   - `app/backend/` — FastAPI + Postgres + Redis API (own `requirements.txt`/`.venv`, separate from the root ones). `main.py` (app + router registration), `config.py`/`database.py`/`cache.py` (infra setup), `constants.py` (vegetable list), `models/` (SQLAlchemy ORM: `historical_price`, `forecast`, `model_metric`), `schemas/` (Pydantic response models), `routers/` + `services/` (one pair per resource: vegetables, models, prices, predictions, plus `health`), `seed.py` (idempotent CSV → Postgres ETL), `alembic/` (schema migrations), `tests/` (pytest + httpx against the live app). See `## Backend API` above for endpoints and gotchas.
 - `configs/config.yaml` — vegetables list, data paths, per-model hyperparameters, vegetable/district name mappings
-- `scripts/train_all.py` — orchestrates all 7 model families x 6 vegetables, writes the combined results tables
+- `scripts/train_all.py` — orchestrates all 9 model families x 6 vegetables, writes the combined results tables
 - `scripts/fetch_weather_openmeteo.py` — repopulates `data/raw/weather/weather.csv` from Open-Meteo
 - `notebooks/` — exploratory analysis; production logic belongs in `src/`, not notebooks. `01_data_exploration.ipynb`, `02_feature_engineering.ipynb`, `03_model_results.ipynb` (the last needs `results/metrics/all_results.csv` from `scripts/train_all.py` to exist first)
 - `research-papers/references/` — literature (PDFs, papers) informing the methodology; gitignored (not checked in), fetch again from `## Literature status` below if missing
@@ -218,4 +230,6 @@ Sourced and read (in `research-papers/references/`, cited in `02_literature_revi
 
 **Satellite/IoT signal for vegetable crops** (Section 2.8, sourced for objective 1 — motivates the NDVI/IoT fusion but neither paper forecasts price): Darra et al. (2023) — Sentinel-2 NDVI ensemble ML for processing tomato yield, ML beat statistical baseline; Ayall et al. (2025) — AI-based "backcasting" for incomplete IoT sensor coverage across growing seasons (strawberry), relevant if this project's own IoT data has coverage gaps.
 
-Note: Darra et al. (2023) and Tzachor et al. (2023) are cited from published metadata only — no local PDF (Sensors blocks automated retrieval despite CC BY; Nature Food is paywalled).
+**SARIMAX+RandomForest / SARIMAX+LSTM hybrid precedent** (Section 2.5, sourced for the `hybrid_random_forest_sarimax` and `hybrid_lstm_sarimax` model families added at supervisor request): Patil et al. (2023) — HySALS, SARIMA-LSTM — is a direct structural precedent for `hybrid_lstm_sarimax` (fit SARIMA(X) first, LSTM corrects its residuals); Ranaweera et al. (2023) — RF strongest among several ML models for Sri Lankan vegetables — motivates Random Forest as a residual-correction choice for `hybrid_random_forest_sarimax`, alongside the existing XGBoost/CatBoost options. Phung & Trinh (2025) — SARIMA-LSTM-Random Forest three-stage hybrid for gold price forecasting — remains cited as a related but structurally different precedent (a three-stage chain, vs. this project's two independent two-stage hybrids).
+
+Note: Darra et al. (2023), Tzachor et al. (2023), and Phung & Trinh (2025) are cited from published metadata only — no local PDF (Sensors blocks automated retrieval despite CC BY; Nature Food is paywalled; Cogent Economics & Finance is gold open-access but Cloudflare-blocks automated retrieval).

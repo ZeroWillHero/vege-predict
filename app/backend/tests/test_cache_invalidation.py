@@ -5,7 +5,7 @@ seed.py call invalidate_vegetable() after every successful commit — this test 
 the invalidation helper itself actually clears what a real request populates."""
 
 from app.backend.cache import get_cached
-from app.backend.services.cache_service import invalidate_vegetable, models_key, prediction_key
+from app.backend.services.cache_service import invalidate_all, invalidate_vegetable, models_key, prediction_key
 
 
 async def test_invalidate_vegetable_clears_cached_entries(client):
@@ -22,4 +22,22 @@ async def test_invalidate_vegetable_clears_cached_entries(client):
 
     # the endpoint still works after invalidation — it just repopulates from Postgres
     resp = await client.get("/models", params={"vegetable": "carrot"})
+    assert resp.status_code == 200
+
+
+async def test_invalidate_all_clears_unfiltered_list_cache(client):
+    """Regression test for a real bug hit while adding a new model family:
+    invalidate_vegetable() only clears keys prefixed by one vegetable's name, which never
+    matches models_key(None) -> "models:all" — so GET /models with no vegetable filter kept
+    serving a stale, pre-retrain row count after a full reseed until invalidate_all() was
+    added and wired into seed.py's main()."""
+    resp = await client.get("/models")
+    assert resp.status_code == 200
+    assert await get_cached(models_key(None)) is not None
+
+    await invalidate_all()
+
+    assert await get_cached(models_key(None)) is None
+
+    resp = await client.get("/models")
     assert resp.status_code == 200

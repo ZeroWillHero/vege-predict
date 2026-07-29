@@ -1,4 +1,4 @@
-"""Train all 7 model families for all 6 vegetables and write the combined comparison table.
+"""Train all 9 model families for all 6 vegetables and write the combined comparison table.
 
 Usage:
     python scripts/train_all.py
@@ -16,6 +16,8 @@ import pandas as pd
 
 from src.models.catboost.train import train_all_vegetables as train_catboost
 from src.models.hybrid_catboost_sarimax.train import train_all_vegetables as train_hybrid_catboost
+from src.models.hybrid_lstm_sarimax.train import train_all_vegetables as train_hybrid_lstm_sarimax
+from src.models.hybrid_random_forest_sarimax.train import train_all_vegetables as train_hybrid_rf_sarimax
 from src.models.hybrid_xgboost_sarimax.train import train_all_vegetables as train_hybrid_xgboost
 from src.models.lstm.train import train_all_vegetables as train_lstm
 from src.models.random_forest.train import train_all_vegetables as train_random_forest
@@ -30,6 +32,8 @@ MODEL_TRAINERS = {
     "catboost": train_catboost,
     "hybrid_xgboost_sarimax": train_hybrid_xgboost,
     "hybrid_catboost_sarimax": train_hybrid_catboost,
+    "hybrid_random_forest_sarimax": train_hybrid_rf_sarimax,
+    "hybrid_lstm_sarimax": train_hybrid_lstm_sarimax,
     "lstm": train_lstm,
 }
 
