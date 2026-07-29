@@ -25,3 +25,6 @@ results/explainability/*
 !results/**/.gitkeep
 
 # research-papers/references/*.pdf
+
+# Internal reference doc, not part of the checked-in project
+models.md

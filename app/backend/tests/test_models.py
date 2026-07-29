@@ -1,14 +1,14 @@
 async def test_list_models_all(client):
     resp = await client.get("/models")
     assert resp.status_code == 200
-    assert len(resp.json()) == 42
+    assert len(resp.json()) == 54
 
 
 async def test_list_models_filtered(client):
     resp = await client.get("/models", params={"vegetable": "carrot"})
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == 7
+    assert len(body) == 9
     assert all(row["vegetable"] == "carrot" for row in body)
     rmses = [row["rmse"] for row in body]
     assert rmses == sorted(rmses)
@@ -44,4 +44,4 @@ async def test_list_models_injection_like_vegetable_is_safe(client):
     # the table must still be intact and queryable afterwards
     follow_up = await client.get("/models", params={"vegetable": "carrot"})
     assert follow_up.status_code == 200
-    assert len(follow_up.json()) == 7
+    assert len(follow_up.json()) == 9

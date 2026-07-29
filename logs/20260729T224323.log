@@ -1,0 +1,300 @@
+Checked 16 packages in 126ms
+=== [20260729T224323] Data collecting ===
+
+checked=0 fetched=0 accepted_rows=0 rejected_rows=0 skipped_empty=0 errors=0
+{'checked_weeks': 0, 'accepted_rows': 0, 'rejected_rows': 0, 'message': 'already up to date'}
+[1/25] Fetching Colombo (6.9271, 79.8612) -> 2014-01-01..2026-07-28
+[2/25] Fetching Gampaha (7.0917, 80.0) -> 2014-01-01..2026-07-28
+[3/25] Fetching Kalutara (6.5854, 79.9607) -> 2014-01-01..2026-07-28
+[4/25] Fetching Kandy (7.2906, 80.6337) -> 2014-01-01..2026-07-28
+[5/25] Fetching Matale (7.4675, 80.6234) -> 2014-01-01..2026-07-28
+[6/25] Fetching Nuwara Eliya (6.9497, 80.7891) -> 2014-01-01..2026-07-28
+[7/25] Fetching Galle (6.0535, 80.221) -> 2014-01-01..2026-07-28
+[8/25] Fetching Matara (5.9549, 80.555) -> 2014-01-01..2026-07-28
+[9/25] Fetching Hambantota (6.1241, 81.1185) -> 2014-01-01..2026-07-28
+[10/25] Fetching Jaffna (9.6615, 80.0255) -> 2014-01-01..2026-07-28
+[11/25] Fetching Kilinochchi (9.3961, 80.4022) -> 2014-01-01..2026-07-28
+[12/25] Fetching Mannar (8.981, 79.9044) -> 2014-01-01..2026-07-28
+[13/25] Fetching Vavuniya (8.7514, 80.4971) -> 2014-01-01..2026-07-28
+[14/25] Fetching Mullaitivu (9.267, 80.8142) -> 2014-01-01..2026-07-28
+[15/25] Fetching Batticaloa (7.717, 81.7) -> 2014-01-01..2026-07-28
+[16/25] Fetching Ampara (7.2975, 81.6747) -> 2014-01-01..2026-07-28
+[17/25] Fetching Trincomalee (8.5874, 81.2152) -> 2014-01-01..2026-07-28
+[18/25] Fetching Kurunegala (7.4863, 80.3623) -> 2014-01-01..2026-07-28
+[19/25] Fetching Puttalam (8.0362, 79.8283) -> 2014-01-01..2026-07-28
+[20/25] Fetching Anuradhapura (8.3114, 80.4037) -> 2014-01-01..2026-07-28
+[21/25] Fetching Polonnaruwa (7.9403, 81.0188) -> 2014-01-01..2026-07-28
+[22/25] Fetching Badulla (6.9934, 81.055) -> 2014-01-01..2026-07-28
+[23/25] Fetching Monaragala (6.8726, 81.351) -> 2014-01-01..2026-07-28
+[24/25] Fetching Ratnapura (6.6828, 80.4012) -> 2014-01-01..2026-07-28
+[25/25] Fetching Kegalle (7.2513, 80.3464) -> 2014-01-01..2026-07-28
+Saved 16425 rows (25 districts) to /Users/chameera/Desktop/projects/Research-Project/data/raw/weather/weather.csv
+=== [20260729T224323] Data quality audit ===
+
+=== prices (data/raw/vegetable_prices/vegetable_prices.csv) ===
+  8184 rows, 2000-01-03 to 2026-06-22
+  [BRINJALS] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [CABBAGE] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [CARROT] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [LEEKS] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [PUMPKIN] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  [SNAKE GOURD] 18 missing week(s): ['2004-12-27', '2009-12-28', '2015-12-28', '2020-12-28', '2025-12-29'] ...
+  wholesale_price: 26 flagged row(s):
+    [BRINJALS] 2010-04-12: wholesale_price=38.0 — week-over-week change 179% > 150%
+    [BRINJALS] 2012-02-27: wholesale_price=22.5 — week-over-week change 154% > 150%
+    [BRINJALS] 2013-12-23: wholesale_price=64.0 — week-over-week change 161% > 150%
+    [BRINJALS] 2017-03-06: wholesale_price=181.428571428571 — week-over-week change 230% > 150%
+    [BRINJALS] 2018-01-01: wholesale_price=211.5384615 — week-over-week change 173% > 150%
+    [BRINJALS] 2025-04-07: wholesale_price=575.0 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2018-01-01: wholesale_price=75.83333333 — week-over-week change 762% > 150%
+    [CABBAGE] 2024-01-01: wholesale_price=440.0 — z-score 5.2 beyond +/-5.0
+    [CABBAGE] 2024-01-15: wholesale_price=553.0 — z-score 6.7 beyond +/-5.0
+    [CABBAGE] 2024-01-22: wholesale_price=451.0 — z-score 5.3 beyond +/-5.0
+  retail_price: 9 flagged row(s):
+    [BRINJALS] 2024-01-15: retail_price=825.1724137931035 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2024-01-01: retail_price=698.4615384615385 — z-score 5.1 beyond +/-5.0
+    [CABBAGE] 2024-01-15: retail_price=854.3333333333334 — z-score 6.5 beyond +/-5.0
+    [CABBAGE] 2024-01-22: retail_price=732.5 — z-score 5.4 beyond +/-5.0
+    [CABBAGE] 2024-01-29: retail_price=734.1379310344828 — z-score 5.4 beyond +/-5.0
+    [CARROT] 2024-01-15: retail_price=1703.3333333333333 — z-score 9.9 beyond +/-5.0
+    [CARROT] 2024-01-22: retail_price=1233.3333333333333 — z-score 6.9 beyond +/-5.0
+    [CARROT] 2024-01-29: retail_price=1537.037037037037 — z-score 8.8 beyond +/-5.0
+    [CARROT] 2024-02-05: retail_price=1150.0 — z-score 6.3 beyond +/-5.0
+
+=== fuel (data/raw/fuel/fuel_data_weekly.csv) ===
+  604 rows, 2015-01-05 to 2026-07-27
+  missing weeks: none
+  diesel_price: no flagged rows
+
+=== weather (data/raw/weather/weather.csv) ===
+  16425 rows, 2013-12-30 to 2026-07-27
+  no missing weeks (per group)
+  average_temperature: no flagged rows
+  average_rainfall: 80 flagged row(s):
+    [Ampara] 2014-12-22: average_rainfall=53.51 — z-score 8.0 beyond +/-5.0
+    [Anuradhapura] 2024-11-25: average_rainfall=46.0 — z-score 6.8 beyond +/-5.0
+    [Anuradhapura] 2025-11-24: average_rainfall=82.83 — z-score 12.8 beyond +/-5.0
+    [Badulla] 2014-12-22: average_rainfall=51.0 — z-score 5.8 beyond +/-5.0
+    [Badulla] 2019-12-09: average_rainfall=45.96 — z-score 5.1 beyond +/-5.0
+    [Badulla] 2020-12-21: average_rainfall=51.26 — z-score 5.8 beyond +/-5.0
+    [Badulla] 2025-11-24: average_rainfall=73.24 — z-score 8.6 beyond +/-5.0
+    [Batticaloa] 2014-12-15: average_rainfall=39.67 — z-score 5.7 beyond +/-5.0
+    [Batticaloa] 2014-12-22: average_rainfall=60.61 — z-score 9.1 beyond +/-5.0
+    [Batticaloa] 2024-11-25: average_rainfall=41.26 — z-score 6.0 beyond +/-5.0
+=== [20260729T224323] Build processed datasets ===
+carrot: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/carrot.csv
+brinjal: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/brinjal.csv
+pumpkin: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/pumpkin.csv
+cabbage: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/cabbage.csv
+snake_gourd: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/snake_gourd.csv
+leeks: 583 rows -> /Users/chameera/Desktop/projects/Research-Project/data/processed/leeks.csv
+=== [20260729T224323] Train all model families ===
+WARNING:tensorflow:5 out of the last 7 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x30dfd5da0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+WARNING:tensorflow:6 out of the last 9 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x30dfd5da0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+
+=== sarimax ===
+carrot/sarimax: holdout RMSE=245.70 MAPE=57.90% R2=-1.629 interval_coverage=0.96 (nominal 0.80)
+brinjal/sarimax: holdout RMSE=124.17 MAPE=21.25% R2=-0.146 interval_coverage=0.63 (nominal 0.80)
+pumpkin/sarimax: holdout RMSE=57.51 MAPE=25.28% R2=-0.247 interval_coverage=0.94 (nominal 0.80)
+cabbage/sarimax: holdout RMSE=110.83 MAPE=33.28% R2=-0.469 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/sarimax: holdout RMSE=108.25 MAPE=21.45% R2=-0.354 interval_coverage=0.52 (nominal 0.80)
+leeks/sarimax: holdout RMSE=95.73 MAPE=16.57% R2=-0.467 interval_coverage=0.77 (nominal 0.80)
+sarimax done in 130.1s
+
+=== random_forest ===
+carrot/random_forest: holdout RMSE=100.94 MAPE=13.42% R2=0.556 interval_coverage=0.54 (nominal 0.80)
+brinjal/random_forest: holdout RMSE=90.74 MAPE=14.61% R2=0.388 interval_coverage=0.56 (nominal 0.80)
+pumpkin/random_forest: holdout RMSE=22.80 MAPE=7.30% R2=0.804 interval_coverage=0.81 (nominal 0.80)
+cabbage/random_forest: holdout RMSE=48.24 MAPE=9.74% R2=0.722 interval_coverage=0.73 (nominal 0.80)
+snake_gourd/random_forest: holdout RMSE=62.55 MAPE=9.50% R2=0.548 interval_coverage=0.65 (nominal 0.80)
+leeks/random_forest: holdout RMSE=50.28 MAPE=8.20% R2=0.595 interval_coverage=0.65 (nominal 0.80)
+random_forest done in 9.2s
+
+=== xgboost ===
+carrot/xgboost: holdout RMSE=108.23 MAPE=14.43% R2=0.490 interval_coverage=0.63 (nominal 0.80)
+brinjal/xgboost: holdout RMSE=100.46 MAPE=15.14% R2=0.250 interval_coverage=0.69 (nominal 0.80)
+pumpkin/xgboost: holdout RMSE=23.25 MAPE=7.34% R2=0.796 interval_coverage=0.85 (nominal 0.80)
+cabbage/xgboost: holdout RMSE=49.90 MAPE=9.56% R2=0.702 interval_coverage=0.85 (nominal 0.80)
+snake_gourd/xgboost: holdout RMSE=72.75 MAPE=10.47% R2=0.389 interval_coverage=0.69 (nominal 0.80)
+leeks/xgboost: holdout RMSE=51.80 MAPE=8.59% R2=0.571 interval_coverage=0.75 (nominal 0.80)
+xgboost done in 23.9s
+
+=== catboost ===
+carrot/catboost: holdout RMSE=112.72 MAPE=13.91% R2=0.447 interval_coverage=0.67 (nominal 0.80)
+brinjal/catboost: holdout RMSE=97.95 MAPE=15.68% R2=0.287 interval_coverage=0.67 (nominal 0.80)
+pumpkin/catboost: holdout RMSE=26.82 MAPE=8.27% R2=0.729 interval_coverage=0.81 (nominal 0.80)
+cabbage/catboost: holdout RMSE=61.97 MAPE=11.00% R2=0.541 interval_coverage=0.85 (nominal 0.80)
+snake_gourd/catboost: holdout RMSE=71.49 MAPE=10.76% R2=0.410 interval_coverage=0.65 (nominal 0.80)
+leeks/catboost: holdout RMSE=48.49 MAPE=8.40% R2=0.624 interval_coverage=0.77 (nominal 0.80)
+catboost done in 18.6s
+
+=== hybrid_xgboost_sarimax ===
+carrot/hybrid_xgboost_sarimax: holdout RMSE=254.60 MAPE=59.61% R2=-1.823 interval_coverage=0.85 (nominal 0.80)
+brinjal/hybrid_xgboost_sarimax: holdout RMSE=128.30 MAPE=21.22% R2=-0.223 interval_coverage=0.69 (nominal 0.80)
+pumpkin/hybrid_xgboost_sarimax: holdout RMSE=59.34 MAPE=25.56% R2=-0.327 interval_coverage=0.90 (nominal 0.80)
+cabbage/hybrid_xgboost_sarimax: holdout RMSE=116.83 MAPE=35.04% R2=-0.632 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_xgboost_sarimax: holdout RMSE=123.07 MAPE=23.66% R2=-0.750 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_xgboost_sarimax: holdout RMSE=98.66 MAPE=17.53% R2=-0.558 interval_coverage=0.75 (nominal 0.80)
+hybrid_xgboost_sarimax done in 154.7s
+
+=== hybrid_catboost_sarimax ===
+carrot/hybrid_catboost_sarimax: holdout RMSE=243.94 MAPE=57.41% R2=-1.591 interval_coverage=0.92 (nominal 0.80)
+brinjal/hybrid_catboost_sarimax: holdout RMSE=131.45 MAPE=21.55% R2=-0.284 interval_coverage=0.62 (nominal 0.80)
+pumpkin/hybrid_catboost_sarimax: holdout RMSE=58.75 MAPE=25.43% R2=-0.301 interval_coverage=0.94 (nominal 0.80)
+cabbage/hybrid_catboost_sarimax: holdout RMSE=115.10 MAPE=34.33% R2=-0.584 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_catboost_sarimax: holdout RMSE=120.11 MAPE=22.74% R2=-0.667 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_catboost_sarimax: holdout RMSE=95.42 MAPE=16.94% R2=-0.457 interval_coverage=0.77 (nominal 0.80)
+hybrid_catboost_sarimax done in 150.3s
+
+=== hybrid_random_forest_sarimax ===
+carrot/hybrid_random_forest_sarimax: holdout RMSE=249.88 MAPE=58.71% R2=-1.719 interval_coverage=0.85 (nominal 0.80)
+brinjal/hybrid_random_forest_sarimax: holdout RMSE=128.70 MAPE=20.51% R2=-0.231 interval_coverage=0.65 (nominal 0.80)
+pumpkin/hybrid_random_forest_sarimax: holdout RMSE=58.86 MAPE=25.64% R2=-0.306 interval_coverage=0.94 (nominal 0.80)
+cabbage/hybrid_random_forest_sarimax: holdout RMSE=114.32 MAPE=34.31% R2=-0.563 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_random_forest_sarimax: holdout RMSE=122.05 MAPE=23.30% R2=-0.721 interval_coverage=0.50 (nominal 0.80)
+leeks/hybrid_random_forest_sarimax: holdout RMSE=95.45 MAPE=17.23% R2=-0.458 interval_coverage=0.77 (nominal 0.80)
+hybrid_random_forest_sarimax done in 142.0s
+
+=== hybrid_lstm_sarimax ===
+carrot/hybrid_lstm_sarimax: holdout RMSE=375.77 MAPE=88.37% R2=-5.149 interval_coverage=0.63 (nominal 0.80)
+brinjal/hybrid_lstm_sarimax: holdout RMSE=217.09 MAPE=40.28% R2=-2.502 interval_coverage=0.38 (nominal 0.80)
+pumpkin/hybrid_lstm_sarimax: holdout RMSE=107.61 MAPE=48.14% R2=-3.365 interval_coverage=0.88 (nominal 0.80)
+cabbage/hybrid_lstm_sarimax: holdout RMSE=197.63 MAPE=59.93% R2=-3.671 interval_coverage=1.00 (nominal 0.80)
+snake_gourd/hybrid_lstm_sarimax: holdout RMSE=166.40 MAPE=35.80% R2=-2.199 interval_coverage=0.54 (nominal 0.80)
+leeks/hybrid_lstm_sarimax: holdout RMSE=150.57 MAPE=32.77% R2=-2.628 interval_coverage=0.71 (nominal 0.80)
+hybrid_lstm_sarimax done in 565.4s
+
+=== lstm ===
+carrot/lstm: holdout RMSE=205.10 MAPE=29.66% R2=-0.832 interval_coverage=0.62 (nominal 0.80)
+brinjal/lstm: holdout RMSE=146.84 MAPE=25.80% R2=-0.602 interval_coverage=0.73 (nominal 0.80)
+pumpkin/lstm: holdout RMSE=54.83 MAPE=19.10% R2=-0.133 interval_coverage=0.58 (nominal 0.80)
+cabbage/lstm: holdout RMSE=97.57 MAPE=21.42% R2=-0.139 interval_coverage=0.79 (nominal 0.80)
+snake_gourd/lstm: holdout RMSE=95.64 MAPE=16.07% R2=-0.057 interval_coverage=0.67 (nominal 0.80)
+leeks/lstm: holdout RMSE=62.69 MAPE=12.79% R2=0.371 interval_coverage=0.79 (nominal 0.80)
+lstm done in 306.9s
+
+Saved 54 rows to /Users/chameera/Desktop/projects/Research-Project/results/metrics/all_results.csv
+Saved 2808 holdout prediction rows to /Users/chameera/Desktop/projects/Research-Project/results/metrics/holdout_predictions.csv
+Saved comparison table to /Users/chameera/Desktop/projects/Research-Project/results/tables/model_comparison.csv
+
+RMSE by vegetable x model (lower is better):
+model        catboost  hybrid_catboost_sarimax  hybrid_lstm_sarimax  hybrid_random_forest_sarimax  hybrid_xgboost_sarimax   lstm  random_forest  sarimax  xgboost
+vegetable                                                                                                                                                        
+brinjal          97.9                    131.4                217.1                         128.7                   128.3  146.8           90.7    124.2    100.5
+cabbage          62.0                    115.1                197.6                         114.3                   116.8   97.6           48.2    110.8     49.9
+carrot          112.7                    243.9                375.8                         249.9                   254.6  205.1          100.9    245.7    108.2
+leeks            48.5                     95.4                150.6                          95.4                    98.7   62.7           50.3     95.7     51.8
+pumpkin          26.8                     58.7                107.6                          58.9                    59.3   54.8           22.8     57.5     23.3
+snake_gourd      71.5                    120.1                166.4                         122.0                   123.1   95.6           62.5    108.3     72.7
+=== [20260729T224323] Genuine future forecast ===
+carrot/sarimax... 9 weeks, predicted range [439.9, 468.3]
+carrot/random_forest... 9 weeks, predicted range [401.9, 476.2]
+carrot/xgboost... 9 weeks, predicted range [373.9, 489.2]
+carrot/catboost... 9 weeks, predicted range [382.3, 482.0]
+carrot/hybrid_xgboost_sarimax... 9 weeks, predicted range [391.9, 463.9]
+carrot/hybrid_catboost_sarimax... 9 weeks, predicted range [417.5, 460.4]
+carrot/hybrid_random_forest_sarimax... 9 weeks, predicted range [426.9, 456.0]
+carrot/hybrid_lstm_sarimax... 9 weeks, predicted range [387.9, 488.1]
+carrot/lstm... Traceback (most recent call last):
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 1106, in _validate_conn
+    conn.connect()
+    ~~~~~~~~~~~~^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 796, in connect
+    sock_and_verified = _ssl_wrap_socket_and_match_hostname(
+        sock=sock,
+    ...<14 lines>...
+        assert_fingerprint=self.assert_fingerprint,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 975, in _ssl_wrap_socket_and_match_hostname
+    ssl_sock = ssl_wrap_socket(
+        sock=sock,
+    ...<8 lines>...
+        tls_in_tls=tls_in_tls,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/util/ssl_.py", line 433, in ssl_wrap_socket
+    ssl_sock = _ssl_wrap_socket_impl(sock, context, tls_in_tls, server_hostname)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/util/ssl_.py", line 477, in _ssl_wrap_socket_impl
+    return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.13/ssl.py", line 455, in wrap_socket
+    return self.sslsocket_class._create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<5 lines>...
+        session=session
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/anaconda3/lib/python3.13/ssl.py", line 1076, in _create
+    self.do_handshake()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/opt/anaconda3/lib/python3.13/ssl.py", line 1372, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+TimeoutError: _ssl.c:1015: The handshake operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 842, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/util/retry.py", line 498, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 466, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=conn.timeout)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 367, in _raise_timeout
+    raise ReadTimeoutError(
+        self, url, f"Read timed out. (read timeout={timeout_value})"
+    ) from err
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=60)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/predict_future.py", line 63, in <module>
+    main()
+    ~~~~^^
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/predict_future.py", line 51, in main
+    df = recursive_forecast(vegetable, model_family, config, horizon_weeks=args.weeks)
+  File "/Users/chameera/Desktop/projects/Research-Project/src/inference/future_forecast.py", line 169, in recursive_forecast
+    exog_df = build_future_exog(vegetable, config, horizon_weeks)
+  File "/Users/chameera/Desktop/projects/Research-Project/src/inference/future_forecast.py", line 86, in build_future_exog
+    daily = fetch_district_forecast(district, lat, lon, days=16)
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/fetch_weather_openmeteo.py", line 117, in fetch_district_forecast
+    resp = requests.get(FORECAST_URL, params=params, timeout=60)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/adapters.py", line 742, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=60)

@@ -48,7 +48,7 @@ data:
 forecasting:
   target_column: retail_price
   date_column: date
-  horizon_weeks: 1  # one-step-ahead (next week) forecast; multi-week-ahead is future work
+  horizon_weeks: 1  # each model's own training/eval design is one-step-ahead
   holdout_weeks: 52  # final untouched test set, most recent year
   cv_splits: 5        # walk-forward splits over the remaining training data
   # Prediction interval level: 0.8 -> 10th/90th percentile of the walk-forward CV folds'
@@ -56,6 +56,14 @@ forecasting:
   # (works the same for SARIMAX, tree-based models, and LSTM) — see src/evaluation/metrics.py's
   # prediction_interval()/interval_coverage().
   interval_confidence: 0.8
+  # Genuine future forecasting (scripts/predict_future.py) chains one-step-ahead predictions
+  # recursively, feeding each week's own prediction back in as the next week's price_lag_1/etc.,
+  # reaching this many weeks past *today's real date* (not just past the last known price date
+  # — the price data can lag behind real time by weeks, and any gap is bridged automatically so
+  # the forecast always reaches genuinely forward). Implemented via src/inference/future_forecast.py,
+  # not a different model design — see CLAUDE.md for the SARIMAX-single-multi-step-call gotcha
+  # this relies on.
+  future_horizon_weeks: 4
 
 models:
   sarimax:
@@ -101,6 +109,10 @@ models:
     residual_model: xgboost
   hybrid_catboost_sarimax:
     residual_model: catboost
+  hybrid_random_forest_sarimax:
+    residual_model: random_forest
+  hybrid_lstm_sarimax:
+    residual_model: lstm
 
 paths:
   trained_models_dir: trained_models

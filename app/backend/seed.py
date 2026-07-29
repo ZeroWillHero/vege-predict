@@ -1,8 +1,9 @@
 """ETL: load the research pipeline's CSV outputs into Postgres.
 
 Reads data/processed/<vegetable>.csv (historical prices), results/metrics/
-holdout_predictions.csv (forecasts), and results/metrics/all_results.csv (model
-comparison metrics) — the same three artifacts scripts/train_all.py produces.
+holdout_predictions.csv (backtest forecasts) plus results/metrics/future_predictions.csv
+(genuine future forecasts, if present — written by scripts/predict_future.py, not
+scripts/train_all.py), and results/metrics/all_results.csv (model comparison metrics).
 
 Idempotent: every insert is an upsert on the table's natural-key unique index, so
 re-running this after a retrain updates existing rows rather than duplicating them.
@@ -29,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from app.backend.constants import VEGETABLES  # noqa: E402
 from app.backend.database import async_session_factory  # noqa: E402
 from app.backend.models import Forecast, HistoricalPrice, ModelMetric  # noqa: E402
-from app.backend.services.cache_service import invalidate_vegetable  # noqa: E402
+from app.backend.services.cache_service import invalidate_all, invalidate_vegetable  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -61,11 +62,9 @@ async def seed_historical_prices(session) -> int:
     return total
 
 
-async def seed_forecasts(session) -> int:
-    path = PROJECT_ROOT / "results" / "metrics" / "holdout_predictions.csv"
+def _forecast_rows_from_csv(path: Path, generated_at: datetime) -> list[dict]:
     df = pd.read_csv(path, parse_dates=["date"])
-    generated_at = datetime.now(timezone.utc)
-    rows = [
+    return [
         {
             "vegetable": row["vegetable"],
             "model_family": row["model"],
@@ -73,11 +72,25 @@ async def seed_forecasts(session) -> int:
             "predicted_price": row["predicted"],
             "predicted_lower": None if pd.isna(row.get("predicted_lower")) else row["predicted_lower"],
             "predicted_upper": None if pd.isna(row.get("predicted_upper")) else row["predicted_upper"],
-            "actual_price": row["actual"],
+            # Genuinely future rows (results/metrics/future_predictions.csv) have no `actual`
+            # column at all; holdout rows always do. Either way this must become SQL NULL, not
+            # NaN — Postgres float8 accepts NaN as a valid (non-NULL) value, which would
+            # silently break the "null for unresolved weeks" contract in schemas/forecast.py.
+            "actual_price": None if pd.isna(row.get("actual")) else row["actual"],
             "generated_at": generated_at,
         }
         for _, row in df.iterrows()
     ]
+
+
+async def seed_forecasts(session) -> int:
+    generated_at = datetime.now(timezone.utc)
+    rows = _forecast_rows_from_csv(PROJECT_ROOT / "results" / "metrics" / "holdout_predictions.csv", generated_at)
+
+    future_path = PROJECT_ROOT / "results" / "metrics" / "future_predictions.csv"
+    if future_path.exists():
+        rows += _forecast_rows_from_csv(future_path, generated_at)
+
     stmt = insert(Forecast).values(rows)
     stmt = stmt.on_conflict_do_update(
         index_elements=["vegetable", "model_family", "forecast_date"],
@@ -129,7 +142,8 @@ async def main():
 
         for vegetable in VEGETABLES:
             await invalidate_vegetable(vegetable)
-        print(f"Invalidated Redis cache for {len(VEGETABLES)} vegetables")
+        await invalidate_all()
+        print(f"Invalidated Redis cache for {len(VEGETABLES)} vegetables (plus unfiltered list caches)")
 
         print(f"historical_price: {n_prices} rows upserted")
         print(f"forecast: {n_forecasts} rows upserted")

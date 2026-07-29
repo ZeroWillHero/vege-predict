@@ -1,0 +1,73 @@
+=== [20260729T163528] Data collecting ===
+
+checked=0 fetched=0 accepted_rows=0 rejected_rows=0 skipped_empty=0 errors=0
+{'checked_weeks': 1, 'accepted_rows': 1, 'rejected_rows': 0}
+[1/25] Fetching Colombo (6.9271, 79.8612) -> 2014-01-01..2026-07-28
+[2/25] Fetching Gampaha (7.0917, 80.0) -> 2014-01-01..2026-07-28
+[3/25] Fetching Kalutara (6.5854, 79.9607) -> 2014-01-01..2026-07-28
+[4/25] Fetching Kandy (7.2906, 80.6337) -> 2014-01-01..2026-07-28
+[5/25] Fetching Matale (7.4675, 80.6234) -> 2014-01-01..2026-07-28
+[6/25] Fetching Nuwara Eliya (6.9497, 80.7891) -> 2014-01-01..2026-07-28
+[7/25] Fetching Galle (6.0535, 80.221) -> 2014-01-01..2026-07-28
+[8/25] Fetching Matara (5.9549, 80.555) -> 2014-01-01..2026-07-28
+[9/25] Fetching Hambantota (6.1241, 81.1185) -> 2014-01-01..2026-07-28
+[10/25] Fetching Jaffna (9.6615, 80.0255) -> 2014-01-01..2026-07-28
+[11/25] Fetching Kilinochchi (9.3961, 80.4022) -> 2014-01-01..2026-07-28
+[12/25] Fetching Mannar (8.981, 79.9044) -> 2014-01-01..2026-07-28
+[13/25] Fetching Vavuniya (8.7514, 80.4971) -> 2014-01-01..2026-07-28
+  rate limited, waiting 5s (attempt 1/5)
+  rate limited, waiting 10s (attempt 2/5)
+[14/25] Fetching Mullaitivu (9.267, 80.8142) -> 2014-01-01..2026-07-28
+[15/25] Fetching Batticaloa (7.717, 81.7) -> 2014-01-01..2026-07-28
+Traceback (most recent call last):
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/fetch_weather_openmeteo.py", line 167, in <module>
+    main()
+    ~~~~^^
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/fetch_weather_openmeteo.py", line 153, in main
+    daily = fetch_district_daily(district, lat, lon, end_date)
+  File "/Users/chameera/Desktop/projects/Research-Project/scripts/fetch_weather_openmeteo.py", line 66, in fetch_district_daily
+    resp = requests.get(ARCHIVE_URL, params=params, timeout=60)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/chameera/Desktop/projects/Research-Project/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "/opt/anaconda3/lib/python3.13/http/client.py", line 1430, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "/opt/anaconda3/lib/python3.13/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "/opt/anaconda3/lib/python3.13/http/client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.13/socket.py", line 719, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "/opt/anaconda3/lib/python3.13/ssl.py", line 1304, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.13/ssl.py", line 1138, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+KeyboardInterrupt

@@ -25,6 +25,10 @@ def prediction_key(vegetable: str, model: str) -> str:
     return f"{PREFIX}:predictions:{vegetable}:{model}"
 
 
+def future_predictions_key(vegetable: str, model: str) -> str:
+    return f"{PREFIX}:predictions:future:{vegetable}:{model}"
+
+
 def predictions_list_key(
     vegetable: str | None, model: str | None, year: int | None, limit: int, offset: int
 ) -> str:
@@ -38,3 +42,14 @@ async def invalidate_vegetable(vegetable: str) -> None:
     await invalidate_prefix(f"{PREFIX}:prices:{vegetable}")
     await invalidate_prefix(f"{PREFIX}:predictions:{vegetable}")
     await invalidate_prefix(f"{PREFIX}:predictions:list:{vegetable}")
+    await invalidate_prefix(f"{PREFIX}:predictions:future:{vegetable}")
+
+
+async def invalidate_all() -> None:
+    """Call once after a full reseed touching every vegetable (e.g. seed.py's main()).
+    invalidate_vegetable() only clears keys prefixed by one vegetable's name, which never
+    matches the unfiltered list-endpoint caches (models_key(None) -> "models:all",
+    predictions_list_key(None, ...) -> "predictions:list:None:..."), so those would
+    otherwise keep serving stale JSON for up to the cache TTL after a full reseed."""
+    await invalidate_prefix(f"{PREFIX}:models:all")
+    await invalidate_prefix(f"{PREFIX}:predictions:list:None")

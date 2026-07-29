@@ -13,6 +13,11 @@ import pandas as pd
 import requests
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+# Open-Meteo's separate forecast endpoint (distinct from the archive endpoint above) — free,
+# no API key, real forecast skill for ~16 days out. Used by src/inference/future_forecast.py
+# for the near term of a genuine future price forecast; beyond its horizon, that module falls
+# back to climatology_estimate() below.
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 START_DATE = "2014-01-01"
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "raw" / "weather" / "weather.csv"
 
@@ -97,6 +102,47 @@ def to_weekly(df: pd.DataFrame) -> pd.DataFrame:
     )
     weekly["week_start_date"] = weekly["week_start_date"].dt.date
     return pd.DataFrame(weekly[["week_start_date", "district", "average_temperature", "average_rainfall"]])
+
+
+def fetch_district_forecast(district: str, lat: float, lon: float, days: int = 16) -> pd.DataFrame:
+    """Real Open-Meteo forecast (not historical) for the next `days` days, same shape as
+    fetch_district_daily()'s output so it can be aggregated with the same to_weekly()."""
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "forecast_days": days,
+        "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
+        "timezone": "Asia/Colombo",
+    }
+    resp = requests.get(FORECAST_URL, params=params, timeout=60)
+    resp.raise_for_status()
+    daily = resp.json()["daily"]
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(daily["time"]),
+            "temperature_max": daily["temperature_2m_max"],
+            "temperature_min": daily["temperature_2m_min"],
+            "rainfall": daily["precipitation_sum"],
+        }
+    )
+    df["district"] = district
+    return df
+
+
+def climatology_estimate(district: str, iso_week: int, weather_csv_path: Path | None = None) -> tuple[float, float]:
+    """Historical (average_temperature, average_rainfall) for a given ISO week-of-year in a
+    district, averaged across every prior year in data/raw/weather/weather.csv. Fallback for
+    future weeks beyond fetch_district_forecast()'s ~16-day real-forecast horizon."""
+    path = weather_csv_path or OUTPUT_PATH
+    df = pd.read_csv(path, parse_dates=["week_start_date"])
+    df = df[df["district"] == district].copy()
+    df["iso_week"] = df["week_start_date"].dt.isocalendar().week.astype(int)
+    match = df[df["iso_week"] == iso_week]
+    if match.empty:
+        # No exact ISO-week match (rare, e.g. week 53) — fall back to the district's
+        # all-time average rather than failing outright.
+        match = df
+    return float(match["average_temperature"].mean()), float(match["average_rainfall"].mean())
 
 
 def main():

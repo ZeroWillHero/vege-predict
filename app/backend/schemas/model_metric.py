@@ -8,7 +8,7 @@ class ModelMetricOut(BaseModel):
 
     vegetable: str = Field(description="Vegetable identifier.", examples=["carrot"])
     model_family: str = Field(
-        description="Model family name — one of the 7 trained families.",
+        description="Model family name — one of the 9 trained families.",
         examples=["random_forest"],
     )
     mae: float = Field(description="Mean Absolute Error on the holdout set (LKR).")
