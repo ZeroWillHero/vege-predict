@@ -8,6 +8,15 @@ name: Train and Deploy
 # setup). `git archive | ssh ... tar -x` only writes the archive's own
 # entries, so gitignored dirs (data/raw/, trained_models/, results/, .venv/)
 # on the box are left untouched by the sync.
+#
+# The pipeline itself (data collection + training all 9 model families x 6
+# vegetables) can run well past 15-30 minutes, and a single foreground SSH
+# session held open that whole time is fragile — any transient blip in the
+# network path (GitHub's runner egress, an EC2 security-group/NAT idle
+# timeout, etc.) kills the session and everything downstream of it, wasting
+# a run that may have already finished training. So it's launched detached
+# (nohup + disown) on the instance, and this workflow polls for completion
+# over short, disposable SSH connections instead of staying attached.
 on:
   push:
     branches: [main]
@@ -30,20 +39,63 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          # Keepalives so each short poll below tolerates brief network hiccups;
+          # doesn't help a session held open for the full training run, which
+          # is exactly why that part runs detached instead (see below).
+          cat >> ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName ${{ secrets.EC2_HOST }}
+            User ${{ secrets.EC2_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+            ConnectTimeout 15
+          EOF
 
       - name: Sync tracked repo files to EC2
         run: |
-          git archive --format=tar HEAD | \
-            ssh -i ~/.ssh/deploy_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-              'tar -x -C ~/Research-Project'
+          git archive --format=tar HEAD | ssh deploy-target 'tar -x -C ~/Research-Project'
 
-      - name: Train, build, deploy, and seed on the instance
+      - name: Launch pipeline on the instance (detached)
+        id: launch
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" '
+          RUN_ID="${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          ssh deploy-target "
             set -euo pipefail
             cd ~/Research-Project
             chmod +x deploy/*.sh
-            deploy/train.sh
-            SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh
-            deploy/seed.sh
-          '
+            mkdir -p logs
+            rm -f logs/ci_${RUN_ID}.exit logs/ci_${RUN_ID}.log
+            nohup bash -c '
+              deploy/train.sh && \
+              SKIP_GIT_PULL=1 API_IMAGE=\"vegepredict-api:${{ github.sha }}\" deploy/deploy.sh && \
+              deploy/seed.sh
+              echo \$? > logs/ci_${RUN_ID}.exit
+            ' > logs/ci_${RUN_ID}.log 2>&1 < /dev/null &
+            disown
+          "
+
+      - name: Wait for completion, showing recent progress
+        env:
+          RUN_ID: ${{ steps.launch.outputs.run_id }}
+        run: |
+          # No overall timeout on purpose — a full grid retrain can legitimately
+          # take a while; GitHub's own job-level timeout (default 6h) is the
+          # real backstop.
+          while true; do
+            if ssh deploy-target "test -f ~/Research-Project/logs/ci_${RUN_ID}.exit"; then
+              break
+            fi
+            echo "==> still running, last 20 log lines:"
+            ssh deploy-target "tail -n 20 ~/Research-Project/logs/ci_${RUN_ID}.log" || echo "(poll failed, will retry)"
+            sleep 20
+          done
+
+          echo "==> Pipeline finished. Full log:"
+          ssh deploy-target "cat ~/Research-Project/logs/ci_${RUN_ID}.log"
+
+          EXIT_CODE="$(ssh deploy-target "cat ~/Research-Project/logs/ci_${RUN_ID}.exit")"
+          echo "==> Remote pipeline exit code: $EXIT_CODE"
+          exit "$EXIT_CODE"
