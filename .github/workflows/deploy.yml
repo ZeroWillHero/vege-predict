@@ -9,18 +9,36 @@ name: Train and Deploy
 # entries, so gitignored dirs (data/raw/, trained_models/, results/, .venv/)
 # on the box are left untouched by the sync.
 #
-# The pipeline itself (data collection + training all 9 model families x 6
-# vegetables) can run well past 15-30 minutes, and a single foreground SSH
-# session held open that whole time is fragile — any transient blip in the
-# network path (GitHub's runner egress, an EC2 security-group/NAT idle
+# Two modes, gated by how the run was triggered (see the "Decide run mode"
+# step below) — deliberately not two separate workflow files, since both
+# share every step except whether deploy/train.sh runs:
+#   - push to main / manual dispatch: backend-only deploy. Rebuilds and
+#     restarts the Docker stack (api/postgres/redis/nginx) and reseeds
+#     Postgres from whatever results/*.csv already exist on the box, but
+#     does NOT re-scrape data or retrain models. Fast, safe for pure
+#     backend/API code changes.
+#   - the Saturday schedule (and manual dispatch with run_training=true):
+#     full pipeline — deploy/train.sh (data collection + retrain all 9
+#     model families x 6 vegetables + future forecasts) first, then the
+#     same deploy+seed.
+#
+# The training path can run well past 15-30 minutes, and a single foreground
+# SSH session held open that whole time is fragile — any transient blip in
+# the network path (GitHub's runner egress, an EC2 security-group/NAT idle
 # timeout, etc.) kills the session and everything downstream of it, wasting
 # a run that may have already finished training. So it's launched detached
-# (nohup + disown) on the instance, and this workflow polls for completion
-# over short, disposable SSH connections instead of staying attached.
+# (nohup + disown) on the instance either way, and this workflow polls for
+# completion over short, disposable SSH connections instead of staying
+# attached.
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: "Also run deploy/train.sh (data collection + full retrain) before deploying — normally only the Saturday schedule does this"
+        type: boolean
+        default: false
   schedule:
     # Every Saturday 00:00 Sri Lanka time (UTC+5:30) = Friday 18:30 UTC.
     # Auto-retrains all model families and regenerates future forecasts on
@@ -62,11 +80,28 @@ jobs:
         run: |
           git archive --format=tar HEAD | ssh deploy-target 'tar -x -C ~/Research-Project'
 
+      - name: Decide run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.run_training }}" = "true" ]; then
+            echo "run_training=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_training=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Launch pipeline on the instance (detached)
         id: launch
+        env:
+          RUN_TRAINING: ${{ steps.mode.outputs.run_training }}
         run: |
           RUN_ID="${{ github.run_id }}-${{ github.run_attempt }}"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "==> run_training=$RUN_TRAINING"
+          if [ "$RUN_TRAINING" = "true" ]; then
+            PIPELINE_CMD='deploy/train.sh && SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh && deploy/seed.sh'
+          else
+            PIPELINE_CMD='SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh && deploy/seed.sh'
+          fi
           ssh deploy-target "
             set -euo pipefail
             cd ~/Research-Project
@@ -74,9 +109,7 @@ jobs:
             mkdir -p logs
             rm -f logs/ci_${RUN_ID}.exit logs/ci_${RUN_ID}.log
             nohup bash -c '
-              deploy/train.sh && \
-              SKIP_GIT_PULL=1 API_IMAGE=\"vegepredict-api:${{ github.sha }}\" deploy/deploy.sh && \
-              deploy/seed.sh
+              ${PIPELINE_CMD}
               echo \$? > logs/ci_${RUN_ID}.exit
             ' > logs/ci_${RUN_ID}.log 2>&1 < /dev/null &
             disown
