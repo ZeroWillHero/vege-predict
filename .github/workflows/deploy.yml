@@ -54,9 +54,14 @@ jobs:
 
       - name: Deploy backend stack
         run: |
-          ssh deploy-target "
+          # bash -lc (login shell) so this picks up the same PATH/profile as an
+          # interactive SSH session — plain `ssh host "cmd"` runs a non-login
+          # shell that skips /etc/profile and ~/.profile, which is why `docker`
+          # can resolve when you SSH in by hand but "command not found" here if
+          # its install location was only added to PATH via a login profile.
+          ssh deploy-target "bash -lc '
             set -euo pipefail
             cd ~/Research-Project
             chmod +x deploy/*.sh
-            SKIP_GIT_PULL=1 API_IMAGE='vegepredict-api:${{ github.sha }}' deploy/deploy.sh
-          "
+            SKIP_GIT_PULL=1 API_IMAGE=\"vegepredict-api:${{ github.sha }}\" deploy/deploy.sh
+          '"
