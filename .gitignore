@@ -9,11 +9,11 @@ catboost_info/
 .pytest_cache/
 
 # data/raw/*
-data/processed/*
-data/external/*
-!data/raw/**/.gitkeep
-!data/processed/.gitkeep
-!data/external/.gitkeep
+# data/processed/*
+# data/external/*
+# !data/raw/**/.gitkeep
+# !data/processed/.gitkeep
+# !data/external/.gitkeep
 
 trained_models/**/*
 !trained_models/**/.gitkeep
