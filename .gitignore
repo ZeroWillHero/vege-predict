@@ -8,12 +8,12 @@ catboost_info/
 .env
 .pytest_cache/
 
-# data/raw/*
-# data/processed/*
-# data/external/*
-# !data/raw/**/.gitkeep
-# !data/processed/.gitkeep
-# !data/external/.gitkeep
+data/raw/*
+data/processed/*
+data/external/*
+!data/raw/**/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
 
 trained_models/**/*
 !trained_models/**/.gitkeep
@@ -24,7 +24,7 @@ results/metrics/*
 results/explainability/*
 !results/**/.gitkeep
 
-# research-papers/references/*.pdf
+research-papers/references/*.pdf
 
 # Internal reference doc, not part of the checked-in project
 models.md
