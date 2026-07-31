@@ -1,56 +1,31 @@
-name: Train and Deploy
+name: Deploy Backend
 
-# Runs on a GitHub-hosted runner, which has no access to data/raw/ (gitignored,
-# lives only on the EC2 box). So this workflow doesn't train locally — it
-# syncs the repo's tracked files to EC2 over SSH, then runs deploy/train.sh,
-# deploy/deploy.sh, and deploy/seed.sh *on the instance itself*, where the
-# data and both .venvs already live (see deploy/setup-ec2.md for the one-time
-# setup). `git archive | ssh ... tar -x` only writes the archive's own
-# entries, so gitignored dirs (data/raw/, trained_models/, results/, .venv/)
-# on the box are left untouched by the sync.
+# Data collection, model training, and Postgres seeding all now run on a
+# separate Windows machine's own cron job (which calls scrapers/train_all.py/
+# predict_future.py and app/backend/seed.py directly against this EC2 box's
+# Postgres). This workflow no longer touches any of that — it ONLY
+# builds/restarts the Docker stack (api/postgres/redis/nginx) so the REST
+# API is up and serving whatever Postgres already has. No training, no
+# seeding, no detached/polling steps — deploy/deploy.sh finishes in a couple
+# of minutes, so this runs as a normal foreground SSH step.
 #
-# Two modes, gated by how the run was triggered (see the "Decide run mode"
-# step below) — deliberately not two separate workflow files, since both
-# share every step except whether deploy/train.sh runs:
-#   - push to main / manual dispatch: backend-only deploy. Rebuilds and
-#     restarts the Docker stack (api/postgres/redis/nginx) and reseeds
-#     Postgres from whatever results/*.csv already exist on the box, but
-#     does NOT re-scrape data or retrain models. Fast, safe for pure
-#     backend/API code changes.
-#   - the Saturday schedule (and manual dispatch with run_training=true):
-#     full pipeline — deploy/train.sh (data collection + retrain all 9
-#     model families x 6 vegetables + future forecasts) first, then the
-#     same deploy+seed.
-#
-# The training path can run well past 15-30 minutes, and a single foreground
-# SSH session held open that whole time is fragile — any transient blip in
-# the network path (GitHub's runner egress, an EC2 security-group/NAT idle
-# timeout, etc.) kills the session and everything downstream of it, wasting
-# a run that may have already finished training. So it's launched detached
-# (nohup + disown) on the instance either way, and this workflow polls for
-# completion over short, disposable SSH connections instead of staying
-# attached.
+# Runs on a GitHub-hosted runner, which has no access to data/raw/
+# (gitignored, lives only on the Windows training machine). It syncs the
+# repo's tracked files to EC2 over SSH, then runs deploy/deploy.sh on the
+# instance itself. `git archive | ssh ... tar -x` only writes the archive's
+# own entries, so gitignored dirs (data/raw/, trained_models/, results/,
+# .venv/) on the box are left untouched by the sync.
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      run_training:
-        description: "Also run deploy/train.sh (data collection + full retrain) before deploying — normally only the Saturday schedule does this"
-        type: boolean
-        default: false
-  schedule:
-    # Every Saturday 00:00 Sri Lanka time (UTC+5:30) = Friday 18:30 UTC.
-    # Auto-retrains all model families and regenerates future forecasts on
-    # the latest scraped data — no code change needed to trigger this run.
-    - cron: "30 18 * * 5"
+  workflow_dispatch: {}
 
 concurrency:
   group: vegepredict-deploy
   cancel-in-progress: false
 
 jobs:
-  train-build-deploy:
+  deploy-backend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -62,9 +37,6 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-          # Keepalives so each short poll below tolerates brief network hiccups;
-          # doesn't help a session held open for the full training run, which
-          # is exactly why that part runs detached instead (see below).
           cat >> ~/.ssh/config <<EOF
           Host deploy-target
             HostName ${{ secrets.EC2_HOST }}
@@ -80,60 +52,11 @@ jobs:
         run: |
           git archive --format=tar HEAD | ssh deploy-target 'tar -x -C ~/Research-Project'
 
-      - name: Decide run mode
-        id: mode
+      - name: Deploy backend stack
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.run_training }}" = "true" ]; then
-            echo "run_training=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_training=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Launch pipeline on the instance (detached)
-        id: launch
-        env:
-          RUN_TRAINING: ${{ steps.mode.outputs.run_training }}
-        run: |
-          RUN_ID="${{ github.run_id }}-${{ github.run_attempt }}"
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "==> run_training=$RUN_TRAINING"
-          if [ "$RUN_TRAINING" = "true" ]; then
-            PIPELINE_CMD='deploy/train.sh && SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh && deploy/seed.sh'
-          else
-            PIPELINE_CMD='SKIP_GIT_PULL=1 API_IMAGE="vegepredict-api:${{ github.sha }}" deploy/deploy.sh && deploy/seed.sh'
-          fi
           ssh deploy-target "
             set -euo pipefail
             cd ~/Research-Project
             chmod +x deploy/*.sh
-            mkdir -p logs
-            rm -f logs/ci_${RUN_ID}.exit logs/ci_${RUN_ID}.log
-            nohup bash -c '
-              ${PIPELINE_CMD}
-              echo \$? > logs/ci_${RUN_ID}.exit
-            ' > logs/ci_${RUN_ID}.log 2>&1 < /dev/null &
-            disown
+            SKIP_GIT_PULL=1 API_IMAGE='vegepredict-api:${{ github.sha }}' deploy/deploy.sh
           "
-
-      - name: Wait for completion, showing recent progress
-        env:
-          RUN_ID: ${{ steps.launch.outputs.run_id }}
-        run: |
-          # No overall timeout on purpose — a full grid retrain can legitimately
-          # take a while; GitHub's own job-level timeout (default 6h) is the
-          # real backstop.
-          while true; do
-            if ssh deploy-target "test -f ~/Research-Project/logs/ci_${RUN_ID}.exit"; then
-              break
-            fi
-            echo "==> still running, last 20 log lines:"
-            ssh deploy-target "tail -n 20 ~/Research-Project/logs/ci_${RUN_ID}.log" || echo "(poll failed, will retry)"
-            sleep 20
-          done
-
-          echo "==> Pipeline finished. Full log:"
-          ssh deploy-target "cat ~/Research-Project/logs/ci_${RUN_ID}.log"
-
-          EXIT_CODE="$(ssh deploy-target "cat ~/Research-Project/logs/ci_${RUN_ID}.exit")"
-          echo "==> Remote pipeline exit code: $EXIT_CODE"
-          exit "$EXIT_CODE"
