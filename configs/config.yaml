@@ -63,7 +63,7 @@ forecasting:
   # the forecast always reaches genuinely forward). Implemented via src/inference/future_forecast.py,
   # not a different model design — see CLAUDE.md for the SARIMAX-single-multi-step-call gotcha
   # this relies on.
-  future_horizon_weeks: 4
+  future_horizon_weeks: 8  # ~2 months
 
 models:
   sarimax:
