@@ -21,6 +21,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch: {}
+  schedule:
+    # Every Saturday 00:00 Sri Lanka time (UTC+5:30) = Friday 18:30 UTC.
+    # Auto-retrains all model families and regenerates future forecasts on
+    # the latest scraped data — no code change needed to trigger this run.
+    - cron: "30 18 * * 5"
 
 concurrency:
   group: vegepredict-deploy
