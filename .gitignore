@@ -28,3 +28,8 @@ results/explainability/*
 
 # Internal reference doc, not part of the checked-in project
 models.md
+
+# Personal Windows Task Scheduler pipeline script (points at a remote DB
+# the user configures locally via app/backend/.env) + its run logs
+scripts/cron_weekly_pipeline.sh
+logs/
