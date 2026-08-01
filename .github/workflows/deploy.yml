@@ -3,18 +3,20 @@ name: Deploy Backend
 # Data collection, model training, and Postgres seeding all now run on a
 # separate Windows machine's own cron job (which calls scrapers/train_all.py/
 # predict_future.py and app/backend/seed.py directly against this EC2 box's
-# Postgres). This workflow no longer touches any of that — it ONLY
-# builds/restarts the Docker stack (api/postgres/redis/nginx) so the REST
-# API is up and serving whatever Postgres already has. No training, no
-# seeding, no detached/polling steps — deploy/deploy.sh finishes in a couple
-# of minutes, so this runs as a normal foreground SSH step.
+# Postgres). This workflow only builds the API image and deploys it — no
+# training, no seeding.
 #
-# Runs on a GitHub-hosted runner, which has no access to data/raw/
-# (gitignored, lives only on the Windows training machine). It syncs the
-# repo's tracked files to EC2 over SSH, then runs deploy/deploy.sh on the
-# instance itself. `git archive | ssh ... tar -x` only writes the archive's
-# own entries, so gitignored dirs (data/raw/, trained_models/, results/,
-# .venv/) on the box are left untouched by the sync.
+# Two jobs:
+#   1. build-and-push: builds app/backend/Dockerfile on the GitHub-hosted
+#      runner and pushes it to GHCR (ghcr.io), authenticated with the
+#      workflow's own GITHUB_TOKEN — no Docker Hub account or extra secrets
+#      needed. This is also what fixes the earlier "docker: command not
+#      found" / full-repo-sync problems: the image is no longer built ON
+#      the EC2 box at all.
+#   2. deploy: syncs only what the server actually needs to run (not build)
+#      the stack — docker-compose.yml and deploy/ — then runs
+#      deploy/pull-and-deploy.sh on the instance, which pulls the
+#      just-pushed image from GHCR and does `docker compose up -d`.
 on:
   push:
     branches: [main]
@@ -24,8 +26,42 @@ concurrency:
   group: vegepredict-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: zerowillhero/vege-predict-api
+
 jobs:
-  deploy-backend:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: app/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,20 +84,28 @@ jobs:
             ConnectTimeout 15
           EOF
 
-      - name: Sync tracked repo files to EC2
+      - name: Ensure deploy directory exists
         run: |
-          git archive --format=tar HEAD | ssh deploy-target 'tar -x -C ~/Research-Project'
+          ssh deploy-target "mkdir -p ~/Research-Project"
 
-      - name: Deploy backend stack
+      - name: Sync only what's needed to run (not build) the stack
         run: |
-          # bash -lc (login shell) so this picks up the same PATH/profile as an
-          # interactive SSH session — plain `ssh host "cmd"` runs a non-login
-          # shell that skips /etc/profile and ~/.profile, which is why `docker`
-          # can resolve when you SSH in by hand but "command not found" here if
-          # its install location was only added to PATH via a login profile.
+          # Just docker-compose.yml and deploy/ (scripts + nginx config) —
+          # NOT the full source tree. Migrations run via `docker compose exec`
+          # against the api container, which already has app/backend/
+          # (including alembic/) baked in from the build-and-push job, so the
+          # host doesn't need those files at all.
+          git archive --format=tar HEAD docker-compose.yml deploy \
+            | ssh deploy-target 'tar -x -C ~/Research-Project'
+
+      - name: Pull and deploy
+        run: |
           ssh deploy-target "bash -lc '
             set -euo pipefail
             cd ~/Research-Project
             chmod +x deploy/*.sh
-            SKIP_GIT_PULL=1 API_IMAGE=\"vegepredict-api:${{ github.sha }}\" deploy/deploy.sh
+            export API_IMAGE=\"${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}\"
+            export GHCR_TOKEN=\"${{ secrets.GITHUB_TOKEN }}\"
+            export GHCR_USER=\"${{ github.actor }}\"
+            deploy/pull-and-deploy.sh
           '"

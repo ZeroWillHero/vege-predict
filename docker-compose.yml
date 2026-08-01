@@ -30,7 +30,10 @@ services:
       retries: 10
 
   api:
-    image: ${API_IMAGE:-vegepredict-api:latest}
+    # Prod/CI path pulls a pre-built image from GHCR (see .github/workflows/deploy.yml
+    # and deploy/pull-and-deploy.sh) — set API_IMAGE to override, e.g. a specific
+    # commit SHA tag. `build:` is kept only for local dev (`docker compose build`).
+    image: ${API_IMAGE:-ghcr.io/zerowillhero/vege-predict-api:latest}
     build:
       context: .
       dockerfile: app/backend/Dockerfile
