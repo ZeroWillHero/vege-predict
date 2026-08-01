@@ -28,7 +28,11 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' vegepredict-postgres)" =
 until [ "$(docker inspect -f '{{.State.Health.Status}}' vegepredict-redis)" = "healthy" ]; do sleep 2; done
 
 echo "==> Running database migrations"
-docker compose exec -T api alembic upgrade head
+# -c is required: the container's WORKDIR is /srv but alembic.ini lives at
+# /srv/app/backend/alembic.ini, so plain `alembic upgrade head` looks for
+# ./alembic.ini in /srv, doesn't find it, and fails with "No 'script_location'
+# key found in configuration" instead of a normal file-not-found error.
+docker compose exec -T api alembic -c app/backend/alembic.ini upgrade head
 
 echo "==> Reloading nginx (picks up any config change without downtime)"
 docker compose exec -T nginx nginx -s reload
