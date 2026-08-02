@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -103,6 +104,28 @@ async def seed_forecasts(session) -> int:
     return len(rows)
 
 
+async def backfill_actual_prices(session) -> int:
+    """Once a genuinely-future forecast's target week has actually passed and real price data
+    for it lands in historical_price (via a later seed_historical_prices() call), resolve that
+    forecast row's actual_price from it — otherwise a forecast row seeded with actual_price=NULL
+    when it was still in the future would stay NULL forever, even after the real price for that
+    week becomes known. Only fills rows still NULL; never overwrites an already-resolved actual
+    (e.g. one already set from a retrain's holdout_predictions.csv)."""
+    stmt = text(
+        """
+        UPDATE forecast
+        SET actual_price = historical_price.retail_price
+        FROM historical_price
+        WHERE forecast.vegetable = historical_price.vegetable
+          AND forecast.forecast_date = historical_price.week_start
+          AND forecast.actual_price IS NULL
+          AND historical_price.retail_price IS NOT NULL
+        """
+    )
+    result = await session.execute(stmt)
+    return result.rowcount
+
+
 async def seed_model_metrics(session) -> int:
     path = PROJECT_ROOT / "results" / "metrics" / "all_results.csv"
     df = pd.read_csv(path)
@@ -137,6 +160,7 @@ async def main():
     async with async_session_factory() as session:
         n_prices = await seed_historical_prices(session)
         n_forecasts = await seed_forecasts(session)
+        n_backfilled = await backfill_actual_prices(session)
         n_metrics = await seed_model_metrics(session)
         await session.commit()
 
@@ -147,6 +171,7 @@ async def main():
 
         print(f"historical_price: {n_prices} rows upserted")
         print(f"forecast: {n_forecasts} rows upserted")
+        print(f"forecast: {n_backfilled} rows backfilled with actual_price from historical_price")
         print(f"model_metric: {n_metrics} rows upserted")
 
 

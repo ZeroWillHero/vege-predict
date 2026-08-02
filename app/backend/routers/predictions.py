@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,10 +129,11 @@ async def future_predictions(
     response_model=list[ForecastOut],
     summary="Search/filter forecast history",
     description=(
-        "Returns forecast rows filtered by any combination of vegetable, model family, and year, "
-        "newest first, paginated with `limit`/`offset`. Unlike `GET /predictions/{vegetable}`, an "
-        "unknown `model` value here is not an error — it simply matches zero rows, so this endpoint "
-        "can also be used to check whether a model family produced any forecasts at all."
+        "Returns forecast rows filtered by any combination of vegetable, model family, year, and "
+        "start/end date, newest first, paginated with `limit`/`offset`. Unlike `GET "
+        "/predictions/{vegetable}`, an unknown `model` value here is not an error — it simply "
+        "matches zero rows, so this endpoint can also be used to check whether a model family "
+        "produced any forecasts at all."
     ),
     response_description="Matching forecast rows, most recent first.",
     responses={404: {"description": "`vegetable` was given but is not one of the tracked vegetables."}},
@@ -148,6 +151,12 @@ async def list_predictions(
     year: int | None = Query(
         default=None, description="Filter to forecasts whose target week falls in this calendar year.", examples=[2026]
     ),
+    start_date: date | None = Query(
+        default=None, description="Only return forecasts on or after this date (inclusive).", examples=["2026-01-01"]
+    ),
+    end_date: date | None = Query(
+        default=None, description="Only return forecasts on or before this date (inclusive).", examples=["2026-12-31"]
+    ),
     limit: int = Query(default=50, ge=1, le=1000, description="Maximum rows to return (1–1000)."),
     offset: int = Query(default=0, ge=0, description="Rows to skip, for pagination."),
     session: AsyncSession = Depends(get_db),
@@ -155,12 +164,14 @@ async def list_predictions(
     if vegetable is not None and vegetable not in VEGETABLES:
         raise HTTPException(status_code=404, detail=f"Unknown vegetable: {vegetable}")
 
-    key = predictions_list_key(vegetable, model, year, limit, offset)
+    key = predictions_list_key(vegetable, model, year, start_date, end_date, limit, offset)
     cached = await get_cached(key)
     if cached is not None:
         return cached
 
-    forecasts = await forecast_service.list_predictions(session, vegetable, model, year, limit, offset)
+    forecasts = await forecast_service.list_predictions(
+        session, vegetable, model, year, start_date, end_date, limit, offset
+    )
     result = [ForecastOut.model_validate(f).model_dump(mode="json") for f in forecasts]
     await set_cached(key, result)
     return result

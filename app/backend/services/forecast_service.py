@@ -2,6 +2,8 @@
 querying model_metric for the lowest RMSE, never a denormalized flag — avoids
 staleness when metrics are updated by a retrain."""
 
+from datetime import date
+
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,6 +63,8 @@ async def list_predictions(
     vegetable: str | None = None,
     model_family: str | None = None,
     year: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[Forecast]:
@@ -71,6 +75,10 @@ async def list_predictions(
         stmt = stmt.where(Forecast.model_family == model_family)
     if year is not None:
         stmt = stmt.where(extract("year", Forecast.forecast_date) == year)
+    if start_date is not None:
+        stmt = stmt.where(Forecast.forecast_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(Forecast.forecast_date <= end_date)
     stmt = stmt.order_by(Forecast.forecast_date.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all())

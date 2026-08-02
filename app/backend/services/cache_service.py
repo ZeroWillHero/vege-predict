@@ -30,9 +30,15 @@ def future_predictions_key(vegetable: str, model: str) -> str:
 
 
 def predictions_list_key(
-    vegetable: str | None, model: str | None, year: int | None, limit: int, offset: int
+    vegetable: str | None,
+    model: str | None,
+    year: int | None,
+    start_date: date | None,
+    end_date: date | None,
+    limit: int,
+    offset: int,
 ) -> str:
-    return f"{PREFIX}:predictions:list:{vegetable}:{model}:{year}:{limit}:{offset}"
+    return f"{PREFIX}:predictions:list:{vegetable}:{model}:{year}:{start_date}:{end_date}:{limit}:{offset}"
 
 
 async def invalidate_vegetable(vegetable: str) -> None:

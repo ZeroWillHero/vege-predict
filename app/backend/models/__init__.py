@@ -5,5 +5,6 @@ have actually been imported somewhere in the process."""
 from app.backend.models.forecast import Forecast
 from app.backend.models.historical_price import HistoricalPrice
 from app.backend.models.model_metric import ModelMetric
+from app.backend.models.user import User
 
-__all__ = ["HistoricalPrice", "Forecast", "ModelMetric"]
+__all__ = ["HistoricalPrice", "Forecast", "ModelMetric", "User"]

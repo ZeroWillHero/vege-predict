@@ -100,8 +100,10 @@ Still open / deferred to a later phase: LLM provider for the advisory module; ho
 - `GET /models?vegetable=` — per-vegetable model comparison (MAE/RMSE/MAPE/R²), sorted by RMSE ascending
 - `GET /predictions/{vegetable}?model=best|<family>` — single latest forecast; `model=best` (default) resolves to the lowest-RMSE model family. Selects purely by `forecast_date`, so this can return a genuinely future, unresolved row (`actual_price: null`) if one exists
 - `GET /predictions/{vegetable}/future?model=best|<family>` — every not-yet-resolved week (`actual_price IS NULL`) for a vegetable, oldest first — the dedicated way to read "the upcoming forecast" as a trajectory rather than filtering the general list endpoint. Empty list (not 404) if `scripts/predict_future.py` hasn't been run yet
-- `GET /predictions?vegetable=&model=&year=&limit=&offset=` — filtered/paginated forecast history
+- `GET /predictions?vegetable=&model=&year=&start_date=&end_date=&limit=&offset=` — filtered/paginated forecast history, including by date range
 - `GET /prices/{vegetable}/history?start_date=&end_date=&limit=&offset=` — historical prices
+- `POST /auth/login`, `GET /auth/me` — JWT login and current-user identity (see User Management & Auth below)
+- `POST /users`, `GET /users`, `GET /users/{id}`, `PATCH /users/{id}` — user account management, role-gated (see User Management & Auth below)
 
 All read endpoints are cache-aside through Redis (`app/backend/cache.py` for the generic get/set/invalidate-by-prefix, `app/backend/services/cache_service.py` for key conventions), TTL 7 days (matches the weekly retrain cadence). **Gotcha, confirmed by a real bug:** a bare Postgres reseed does *not* invalidate Redis — the API kept serving pre-retrain cached JSON (missing the newly added prediction-interval fields) until `seed.py` started calling `cache_service.invalidate_vegetable()` for every vegetable after its commit. Any future write path that changes `forecast`/`model_metric`/`historical_price` data (the still-pending `auto_retrain.py` included) must invalidate the same way — don't reintroduce a bare commit with no cache invalidation. Guarded by `app/backend/tests/test_cache_invalidation.py`.
 
@@ -110,6 +112,25 @@ All read endpoints are cache-aside through Redis (`app/backend/cache.py` for the
 **Tests** (`app/backend/tests/`, `pytest` + `httpx.AsyncClient` against the live app, hitting the real seeded Postgres/Redis rather than mocks): run with `app/backend/.venv/bin/python3 -m pytest app/backend/tests/ -c app/backend/pytest.ini`. Coverage includes edge cases per endpoint, not just the happy path: unknown/case-mismatched vegetables, unknown model families (404 on the single-forecast endpoint, empty list rather than an error on the filtered list endpoint — deliberately different, since only `vegetable` is validated against a closed set), out-of-range/invalid pagination (`limit`/`offset` boundaries → 422), invalid date ranges and formats, SQL-injection-shaped input (safe due to parameterized queries — verified the table is still queryable afterward), pagination-page disjointness, and a cross-endpoint consistency check (`/predictions/{veg}?model=best` matches the lowest-RMSE row from `/models`). **Gotcha:** `app/backend/pytest.ini` sets both `asyncio_default_fixture_loop_scope = session` and `asyncio_default_test_loop_scope = session` — required because `cache.py`'s Redis client and `database.py`'s SQLAlchemy engine are module-level singletons created once at import time; pytest-asyncio's default per-test event loop tears down and reopens a loop for every test, which breaks a singleton connection pool opened on an earlier (now-closed) loop with `RuntimeError: Event loop is closed`. Both ini keys are needed — fixture scope alone does not also cover the per-test loop.
 
 Run the API locally: `app/backend/.venv/bin/python3 -m uvicorn app.backend.main:app --reload --port 8000` (from the project root, so the `app.backend.*` absolute imports resolve).
+
+### User Management & Auth
+
+Three roles — `superadmin`, `admin`, `farmer` — stored on the `users` table (`app/backend/models/user.py`: first_name, last_name, email (unique), hashed_password, role, is_active, created_at/updated_at). Auth is stateless JWT (HS256, `app/backend/security.py`), issued by `POST /auth/login` and passed as `Authorization: Bearer <token>` — deliberately not cookie/session-based, since the API's CORS is `allow_origins=["*"]` with `allow_credentials=False` (a wildcard-origin + credentialed-cookie combination browsers reject anyway). `VEGEPREDICT_JWT_SECRET`/`VEGEPREDICT_JWT_EXPIRE_MINUTES` in `.env` control signing; `config.py`'s default secret is dev-only and must be overridden in production.
+
+**Existing read endpoints (`/vegetables`, `/models`, `/predictions*`, `/prices*`) stay fully public — auth applies only to `/auth/*` and `/users*`.** There is no public self-registration; the very first account must be created via the standalone `app/backend/create_superadmin.py` script (mirrors `seed.py`'s style — `VEGEPREDICT_SUPERADMIN_PASSWORD` env var or an interactive prompt, never a CLI arg, to avoid shell-history leakage). Every subsequent account is created through `POST /users` by an existing admin/superadmin.
+
+Permission matrix (enforced partly at the router via `security.require_role()`, partly in `services/user_service.py` since several rules depend on the relationship between the caller and the *target* user, not just the caller's role alone):
+
+| Endpoint | Roles | Notes |
+|---|---|---|
+| `POST /auth/login` | public | generic 401 on any failure — doesn't distinguish unknown email / wrong password / deactivated account |
+| `GET /auth/me` | any authenticated | self only |
+| `POST /users` | superadmin, admin | superadmin: any role. admin: `role` must be `farmer`, else 403 |
+| `GET /users` | superadmin, admin | superadmin: all users. admin: farmers + self only |
+| `GET /users/{id}` | superadmin, admin | admin requesting another admin/superadmin gets 404, not 403 — avoids confirming the account exists |
+| `PATCH /users/{id}` | superadmin, admin, self | only superadmin may change `role`; admin may edit/deactivate farmers only; farmer may edit only their own name/password |
+
+No hard delete — deactivation is `PATCH .../is_active=false`. Full coverage of this matrix lives in `app/backend/tests/test_auth.py`/`test_users.py`, using `conftest.py`'s `superadmin_user`/`admin_user`/`farmer_user` + matching `*_token` fixtures (insert a `User` row directly, then log in through the real `/auth/login` endpoint to get a token — same real-Postgres/no-mocks convention as the rest of the suite).
 
 ## Setup
 
@@ -202,7 +223,7 @@ Model hyperparameters (SARIMAX order/seasonal_order, LSTM architecture, XGBoost/
 - `trained_models/<model_family>/` — serialized fitted models, one file per vegetable
 - `results/{figures,tables,metrics,explainability}/` — plots, comparison tables, metric outputs, and SHAP visuals for the paper
 - `app/` — prototype forecast + explanation + advisory interface (web/mobile)
-  - `app/backend/` — FastAPI + Postgres + Redis API (own `requirements.txt`/`.venv`, separate from the root ones). `main.py` (app + router registration), `config.py`/`database.py`/`cache.py` (infra setup), `constants.py` (vegetable list), `models/` (SQLAlchemy ORM: `historical_price`, `forecast`, `model_metric`), `schemas/` (Pydantic response models), `routers/` + `services/` (one pair per resource: vegetables, models, prices, predictions, plus `health`), `seed.py` (idempotent CSV → Postgres ETL), `alembic/` (schema migrations), `tests/` (pytest + httpx against the live app). See `## Backend API` above for endpoints and gotchas.
+  - `app/backend/` — FastAPI + Postgres + Redis API (own `requirements.txt`/`.venv`, separate from the root ones). `main.py` (app + router registration), `config.py`/`database.py`/`cache.py`/`security.py` (infra setup — `security.py` owns password hashing, JWT issuing/verification, and the `get_current_user`/`require_role` auth dependencies), `constants.py` (vegetable list), `models/` (SQLAlchemy ORM: `historical_price`, `forecast`, `model_metric`, `user`), `schemas/` (Pydantic response models), `routers/` + `services/` (one pair per resource: vegetables, models, prices, predictions, auth, users, plus `health`), `seed.py` (idempotent CSV → Postgres ETL), `create_superadmin.py` (standalone script to bootstrap the first account, mirrors `seed.py`'s style), `alembic/` (schema migrations), `tests/` (pytest + httpx against the live app). See `## Backend API` above for endpoints and gotchas, and `### User Management & Auth` for the role/permission model.
 - `configs/config.yaml` — vegetables list, data paths, per-model hyperparameters, vegetable/district name mappings
 - `scripts/train_all.py` — orchestrates all 9 model families x 6 vegetables, writes the combined results tables
 - `scripts/fetch_weather_openmeteo.py` — repopulates `data/raw/weather/weather.csv` from Open-Meteo

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from app.backend.config import settings  # noqa: E402
 from app.backend.database import Base  # noqa: E402
-from app.backend.models import Forecast, HistoricalPrice, ModelMetric  # noqa: E402, F401
+from app.backend.models import Forecast, HistoricalPrice, ModelMetric, User  # noqa: E402, F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

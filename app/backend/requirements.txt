@@ -9,3 +9,8 @@ pandas
 httpx
 pytest
 pytest-asyncio
+passlib[bcrypt]
+bcrypt<4.1  # passlib 1.7.4 breaks on bcrypt>=4.1's removed __about__.__version__ attribute
+python-jose[cryptography]
+python-multipart
+pydantic[email]
