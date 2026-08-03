@@ -1,3 +1,6 @@
+from datetime import date
+
+
 async def test_latest_prediction_best(client):
     resp = await client.get("/predictions/carrot", params={"model": "best"})
     assert resp.status_code == 200
@@ -137,6 +140,53 @@ async def test_future_predictions_unknown_model_returns_empty_not_error(client):
     resp = await client.get("/predictions/carrot/future", params={"model": "not_a_real_model"})
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+async def test_future_predictions_date_range_filters(client):
+    resp = await client.get(
+        "/predictions/carrot/future",
+        params={"model": "random_forest", "start_date": "2026-07-26", "end_date": "2026-08-01"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["forecast_date"] == "2026-07-27"
+
+
+async def test_future_predictions_date_range_excludes_out_of_range_weeks(client):
+    resp = await client.get(
+        "/predictions/carrot/future",
+        params={"model": "random_forest", "start_date": "2030-01-01"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_list_predictions_defaults_to_today_onward(client):
+    resp = await client.get("/predictions", params={"vegetable": "carrot", "model": "random_forest", "limit": 100})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) > 0
+    today = date.today().isoformat()
+    assert all(row["forecast_date"] >= today for row in body)
+
+
+async def test_list_predictions_explicit_year_overrides_today_default(client):
+    resp = await client.get("/predictions", params={"vegetable": "carrot", "year": 2025, "limit": 3})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 3
+    assert all(row["forecast_date"].startswith("2025") for row in body)
+
+
+async def test_list_predictions_explicit_start_date_overrides_today_default(client):
+    resp = await client.get(
+        "/predictions", params={"vegetable": "carrot", "start_date": "2025-01-01", "end_date": "2025-12-31", "limit": 3}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 3
+    assert all(row["forecast_date"].startswith("2025") for row in body)
 
 
 async def test_best_model_matches_lowest_rmse_in_models_endpoint(client):

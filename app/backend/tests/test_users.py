@@ -1,3 +1,5 @@
+import asyncio
+
 from app.backend.tests.conftest import auth_headers
 
 
@@ -158,3 +160,62 @@ async def test_update_nonexistent_user_returns_404(client, superadmin_token):
         "/users/999999999", json={"first_name": "X"}, headers=auth_headers(superadmin_token)
     )
     assert resp.status_code == 404
+
+
+async def test_create_user_oversized_password_is_422_not_500(client, superadmin_token):
+    payload = _payload("farmer", "oversized")
+    payload["password"] = "x" * 200
+    resp = await client.post("/users", json=payload, headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_create_user_short_password_is_422(client, superadmin_token):
+    payload = _payload("farmer", "short")
+    payload["password"] = "short"
+    resp = await client.post("/users", json=payload, headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_create_user_missing_fields_is_422(client, superadmin_token):
+    resp = await client.post("/users", json={"email": "incomplete@test.vegepredict.com"}, headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_create_user_invalid_role_is_422(client, superadmin_token):
+    payload = _payload("dictator", "badrole")
+    resp = await client.post("/users", json=payload, headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_create_user_invalid_email_is_422(client, superadmin_token):
+    payload = _payload("farmer", "bademail")
+    payload["email"] = "not-an-email"
+    resp = await client.post("/users", json=payload, headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_update_user_oversized_password_is_422(client, superadmin_token, farmer_user):
+    target_id, _, _ = farmer_user
+    resp = await client.patch(
+        f"/users/{target_id}", json={"password": "x" * 200}, headers=auth_headers(superadmin_token)
+    )
+    assert resp.status_code == 422
+
+
+async def test_get_user_non_integer_id_is_422(client, superadmin_token):
+    resp = await client.get("/users/not-an-id", headers=auth_headers(superadmin_token))
+    assert resp.status_code == 422
+
+
+async def test_concurrent_duplicate_email_creation_only_one_succeeds(client, superadmin_token):
+    """Regression test for the create_user() race: two requests racing to create the same
+    email must result in exactly one 201 and one 409 (or two 409s), never a 500 from an
+    unhandled IntegrityError."""
+    payload = _payload("farmer", "race")
+
+    async def _attempt():
+        return await client.post("/users", json=payload, headers=auth_headers(superadmin_token))
+
+    responses = await asyncio.gather(_attempt(), _attempt())
+    statuses = sorted(r.status_code for r in responses)
+    assert statuses in ([201, 409], [409, 409])
