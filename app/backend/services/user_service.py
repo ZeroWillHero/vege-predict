@@ -4,6 +4,7 @@ between the caller and the target (e.g. an admin may only touch farmer accounts)
 router-level require_role() check alone can't express. See CLAUDE.md's permission matrix."""
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.models import User
@@ -44,7 +45,14 @@ async def create_user(session: AsyncSession, actor: User, payload: UserCreate) -
         role=payload.role.value,
     )
     session.add(user)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError:
+        # Safety net for a concurrent request winning the same email between the pre-check
+        # above and this insert - the unique index is the real guarantee, the pre-check is
+        # just a fast path for the common (non-racing) case.
+        await session.rollback()
+        raise DuplicateEmail(f"Email already registered: {payload.email}")
     await session.refresh(user)
     return user
 

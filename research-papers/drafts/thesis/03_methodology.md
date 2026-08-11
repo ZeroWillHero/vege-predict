@@ -170,7 +170,7 @@ STL (Seasonal and Trend) decomposition was applied using a 52-week seasonal peri
 
 ## 3.7 Forecasting Model Development
 
-Seven model families were trained and compared for each vegetable. They included a classical statistical model, three tree-based machine-learning models, one deep-learning model, and two hybrid models.
+Nine model families were trained and compared for each vegetable. They included a classical statistical model, three tree-based machine-learning models, one deep-learning model, and four hybrid statistical/machine-learning models. All nine families were trained through the same shared pipeline (`src/models/common.py::run_training()`, described in §3.7.4), so every model receives an identical time-based data split, feature set, and evaluation procedure — only the model-fitting step differs between families.
 
 | Model | Model type | Role in the research |
 |---|---|---|
@@ -179,14 +179,16 @@ Seven model families were trained and compared for each vegetable. They included
 | XGBoost | Gradient-boosted decision trees | Builds trees in sequence so that later trees correct earlier errors. |
 | CatBoost | Gradient-boosted decision trees | Uses boosting and regularisation to learn complex tabular relationships. |
 | LSTM | Deep-learning sequence model | Reads sequences of earlier weeks and learns short- and longer-term dependencies. |
-| Hybrid XGBoost-SARIMAX | Hybrid statistical and machine-learning model | Combines a SARIMAX forecast with an XGBoost-based correction. |
-| Hybrid CatBoost-SARIMAX | Hybrid statistical and machine-learning model | Combines a SARIMAX forecast with a CatBoost-based correction. |
+| Hybrid XGBoost-SARIMAX | Hybrid statistical and machine-learning model | Combines a SARIMAX forecast with an XGBoost-based correction of its residuals. |
+| Hybrid CatBoost-SARIMAX | Hybrid statistical and machine-learning model | Combines a SARIMAX forecast with a CatBoost-based correction of its residuals. |
+| Hybrid Random Forest-SARIMAX | Hybrid statistical and machine-learning model | Combines a SARIMAX forecast with a Random Forest-based correction of its residuals. |
+| Hybrid LSTM-SARIMAX | Hybrid statistical and deep-learning model | Combines a SARIMAX forecast with an LSTM-based correction of its residuals, reusing the plain LSTM's sequence-building and scaling logic on the residual series. |
 
-*Table 3.3 summarises their roles in the research*
+*Table 3.3: The nine forecasting model families and their roles in the research*
 
 ### 3.7.1 Time Series Forecasting Models
 
-ARIMA means Autoregressive Integrated Moving Average. It represents relationships with earlier values, differencing, and earlier errors. SARIMA extends ARIMA by adding seasonal terms. SARIMAX further extends SARIMA by including external variables. In this project, SARIMAX was the classical model included in the final seven-model comparison because it could use weekly temperature, rainfall, and diesel price together with the historical price series.
+ARIMA means Autoregressive Integrated Moving Average. It represents relationships with earlier values, differencing, and earlier errors. SARIMA extends ARIMA by adding seasonal terms. SARIMAX further extends SARIMA by including external variables. In this project, SARIMAX was the classical model included in the final nine-model comparison because it could use weekly temperature, rainfall, and diesel price together with the historical price series.
 
 Stationarity was checked before fitting the classical model. A stationary series has a broadly stable mean and variance over time. The Augmented Dickey-Fuller test was used as the formal stationarity test. A p-value below 0.05 was used as evidence against the null hypothesis of a unit root. First-order differencing was used to reduce non-stationarity where required.
 
@@ -200,13 +202,32 @@ Random Forest, XGBoost, and CatBoost were trained using the engineered weekly fe
 
 XGBoost and CatBoost are gradient-boosting models. They build decision trees in sequence. Each new tree focuses on part of the error that remains after the earlier trees. The models can learn interactions among lagged prices, rolling statistics, calendar variables, weather, and diesel prices. Regularisation and validation-based tuning were used to reduce overfitting.
 
-The project also included hybrid XGBoost-SARIMAX and hybrid CatBoost-SARIMAX models. In these models, SARIMAX represents the main linear and seasonal structure, while the boosting model learns a correction for remaining non-linear error. The final hybrid forecast combines the statistical forecast and the machine-learning correction.
+The project also included four hybrid models: hybrid XGBoost-SARIMAX, hybrid CatBoost-SARIMAX, hybrid Random Forest-SARIMAX, and hybrid LSTM-SARIMAX. All four share one design (`HybridSarimaxResidualModel` in `src/models/hybrid_xgboost_sarimax/train.py`, reused by the CatBoost and Random Forest hybrids; a parallel `HybridSarimaxLstmModel` in `src/models/hybrid_lstm_sarimax/train.py` for the LSTM variant, since a Keras model cannot be serialised the same way as the other residual models): SARIMAX is fitted first and represents the main linear and seasonal structure, its in-sample residuals (actual price minus SARIMAX's fitted value) are then computed, and a second model — XGBoost, CatBoost, Random Forest, or LSTM — is trained to predict those residuals from the same engineered feature set. The final hybrid forecast is the sum of the SARIMAX forecast and the residual model's correction. The hybrid Random Forest-SARIMAX model was added to test whether Random Forest's strong standalone performance (§3.10) would carry over as a residual corrector, following the precedent that Random Forest performed strongly among machine-learning models tested on Sri Lankan vegetable prices (Ranaweera et al., 2023). The hybrid LSTM-SARIMAX model follows a structural precedent from HySALS, a SARIMA-LSTM hybrid for a different commodity (Patil et al., 2023), and additionally clips the SARIMAX residual to ten times its in-sample standard deviation before scaling, because SARIMAX's out-of-sample forecast can occasionally diverge to an extreme value on a small early cross-validation fold, which would otherwise overflow the LSTM's float32 scaling step.
 
 ### 3.7.3 Deep Learning Models
 
 The deep-learning model used in the final comparison was Long Short-Term Memory (LSTM). LSTM is a type of artificial neural network developed for sequential data. Unlike a tree-based model that receives one feature row, an LSTM receives a sequence containing several earlier weeks and predicts the following weekly price.
 
 The input features were scaled before training so that variables with different numerical ranges could be processed more reliably. The sequences were passed through LSTM memory units and then an output layer that returned one predicted price. The network weights were updated by minimising a training loss. Validation loss and early stopping were used to reduce overfitting. The final LSTM structure and training values were controlled by the project model configuration.
+
+### 3.7.4 Implementation: Core Modules and Functions
+
+To keep the study reproducible, every stage of the pipeline described above corresponds to a small number of named functions in the project's source code rather than to code duplicated inside each script. Table 3.3a lists the core functions referred to in this chapter, organised by pipeline stage, so that another researcher can locate the exact implementation of any step.
+
+| Pipeline stage | Module | Core functions | Purpose |
+|---|---|---|---|
+| Data integration | `src/data_processing/build_dataset.py` | `load_prices()`, `load_fuel()`, `load_weather()`, `build_dataset()` | Read each raw source, filter/rename to a common weekly schema, and inner-join price, weather, and diesel records on the week date for one vegetable. |
+| Feature engineering | `src/features/feature_engineering.py` | `build_features()`, `get_feature_columns()` | Build the twenty input features listed in Table 3.2 (price lags, rolling mean/std, calendar variables, season flag, lagged exogenous variables) from the integrated weekly dataset, and return the list of feature-column names used by every model. |
+| Evaluation metrics | `src/evaluation/metrics.py` | `mae()`, `rmse()`, `mape()`, `r2()`, `evaluate()`, `time_series_splits()`, `prediction_interval()`, `interval_coverage()` | Compute the four error measures used throughout this chapter; generate the walk-forward cross-validation folds and the final holdout split; derive the empirical prediction interval from pooled cross-validation residuals and measure how much of the holdout actual values fall inside it. |
+| Shared training pipeline | `src/models/common.py` | `load_features()`, `run_training()`, `run_for_vegetables()` | Load the featurised dataset for one vegetable; run the common training-and-evaluation procedure shared by all nine model families (build cross-validation folds, fit and score each fold, compute the pooled-residual prediction interval, refit on the holdout split, refit again on the full dataset for the production artefact, and save the result); repeat this across the six vegetables for a given model family. |
+| SARIMAX | `src/models/sarimax/train.py` | `_fit()`, `get_order_for_vegetable()`, `SarimaxArtifact` | Fit a `statsmodels` SARIMAX model with the exogenous features, order, and seasonal order described in §3.7.1; look up the AIC-selected non-seasonal order for a given vegetable from configuration; store a lightweight, picklable representation of the fitted model instead of the full results object. |
+| Random Forest / XGBoost / CatBoost | `src/models/random_forest/train.py`, `src/models/xgboost/train.py`, `src/models/catboost/train.py` | `_make_model()`, `make_fit_predict()`, `make_fit_final()` | Construct the scikit-learn/XGBoost/CatBoost regressor with the fixed hyperparameters in Table 3.3b, and adapt it to the shared `run_training()` interface. |
+| LSTM | `src/models/lstm/train.py` | `_scale()`, `_build_sequences()`, `_build_model()`, `_fit_lstm()`, `_predict()` | Scale the feature table, construct overlapping sequences of length `lookback`, build and compile the Keras LSTM network described in §3.7.3, train it with early stopping, and inverse-transform its predictions back to price units. |
+| Hybrid models | `src/models/hybrid_xgboost_sarimax/train.py`, `src/models/hybrid_catboost_sarimax/train.py`, `src/models/hybrid_random_forest_sarimax/train.py`, `src/models/hybrid_lstm_sarimax/train.py` | `HybridSarimaxResidualModel`, `HybridSarimaxLstmModel`, `_fit_hybrid()` | Fit SARIMAX, compute its in-sample residuals, and fit the corresponding residual model (XGBoost, CatBoost, Random Forest, or LSTM) on those residuals, as described in §3.7.2. |
+| SARIMAX order search | `scripts/select_sarimax_order.py` | `search_vegetable()` | Fit every candidate `(p, 1, q)` order for `p, q ∈ {0, 1, 2}` with the seasonal order held fixed, and record AIC/BIC/HQIC for each, for one vegetable. |
+| Full-grid orchestration | `scripts/train_all.py` | `main()`, `MODEL_TRAINERS` | Run all nine model families across all six vegetables (54 total model fits), and write the combined metrics, holdout-prediction, and model-comparison tables used throughout this chapter and Chapter 4. |
+
+*Table 3.3a: Core implementation functions referenced in this chapter, by pipeline stage*
 
 ## 3.8 Model Training and Validation
 
@@ -220,9 +241,38 @@ Walk-forward validation was used within the earlier data. An initial historical 
 
 ### 3.8.2 Hyperparameter Tuning
 
-Model settings were selected using validation performance, not the final test data. For Random Forest, the tuning process considered the number of trees, tree depth, minimum samples, and the number of features used at a split. For XGBoost and CatBoost, it considered the number of trees or repetitions, learning rate, depth, sampling, and regularisation. For LSTM, the adjustable settings included sequence length, number of layers and units, dropout, batch size, learning rate, number of periods, and early-stopping settings.
+Two different tuning approaches were used in this study, because SARIMAX's parameters and the machine-learning/deep-learning models' parameters have fundamentally different characteristics.
 
-SARIMAX tuning followed a different process because its parameters describe the statistical structure of the series. Candidate non-seasonal and seasonal orders were compared using AIC on the training data. After a configuration was selected, the model was evaluated with the same future validation and test periods used for the other model families.
+**SARIMAX order selection** used a genuine, automated search. The non-seasonal order `(p, d, q)` was selected separately for each vegetable by `scripts/select_sarimax_order.py::search_vegetable()`, which fitted every candidate order for `p, q ∈ {0, 1, 2}` with `d = 1` and the seasonal order `(1, 0, 1, 52)` held fixed (nine candidate orders per vegetable, fitted on the full training series), and recorded the Akaike Information Criterion (AIC), Bayesian Information Criterion (BIC), and Hannan-Quinn Information Criterion (HQIC) for each. The order that minimised AIC was selected for each vegetable, following the standard Box-Jenkins approach to order identification. The resulting orders — `(0,1,2)` for carrot, `(1,1,2)` for leeks, and `(2,1,2)` for brinjal, pumpkin, cabbage, and snake gourd — were written to `results/tables/sarimax_order_selection.csv` and then set as `order_by_vegetable` in the project's central configuration file (`configs/config.yaml`), from which `src/models/sarimax/train.py::get_order_for_vegetable()` reads them at training time. This is an offline, once-off procedure: it is run manually when the SARIMAX order needs re-selecting, not automatically on every training run. As noted in §3.10, the AIC-selected order improved holdout accuracy for some vegetables (for example pumpkin, whose SARIMAX RMSE fell from 110.8 to 57.5) but slightly worsened it for others (carrot, brinjal, and snake gourd), because AIC measures in-sample fit rather than out-of-sample generalisation; this is why AIC is used only to choose the SARIMAX order, and out-of-sample holdout RMSE is used for the final cross-model selection.
+
+**Random Forest, XGBoost, CatBoost, and LSTM did not use an automated hyperparameter search** such as grid search, random search, or Bayesian optimisation — no such procedure exists anywhere in the codebase. Instead, each model family's hyperparameters were fixed, manually-chosen values, set once in `configs/config.yaml` and read directly by that model's `_make_model()` (Random Forest, XGBoost, CatBoost) or `_build_model()` (LSTM) function. This is a deliberate, scale-appropriate design choice for a study that already compares nine model families across six vegetables (54 model fits): running an automated search independently for every family/vegetable combination would multiply the computational cost by the size of each search space, which was judged unnecessary given that the chosen values follow common practice for tabular gradient-boosting and bagging models and produced a clear, stable ranking across vegetables (§3.10). The fixed values used are listed in Table 3.3b. A `random_state`/`random_seed` of 42 was fixed for Random Forest, XGBoost, and CatBoost so that results are reproducible between runs; LSTM/hybrid-LSTM-SARIMAX remain the only stochastic model families, since Keras weight initialisation is not seeded, and their holdout numbers can vary slightly between training runs for this reason.
+
+| Model | Hyperparameter | Value |
+|---|---|---|
+| Random Forest | `n_estimators` | 500 |
+| | `max_depth` | 10 |
+| | `min_samples_leaf` | 2 |
+| XGBoost | `n_estimators` | 500 |
+| | `max_depth` | 6 |
+| | `learning_rate` | 0.05 |
+| CatBoost | `iterations` | 1000 |
+| | `depth` | 6 |
+| | `learning_rate` | 0.05 |
+| LSTM | `lookback` (sequence length) | 30 weeks |
+| | `layers` | 2 |
+| | `units` per layer | 64 |
+| | `dropout` | 0.2 |
+| | `batch_size` | 32 |
+| | `epochs` | 100 (with early stopping) |
+| | `learning_rate` | 0.001 |
+| SARIMAX | `seasonal_order` | (1, 0, 1, 52), fixed for all vegetables |
+| | non-seasonal order | AIC-selected per vegetable (see above) |
+
+*Table 3.3b: Fixed hyperparameter values used for each model family, from `configs/config.yaml`*
+
+The only automated, training-time adjustment for any of the machine-learning/deep-learning models is Keras's `EarlyStopping` callback for LSTM (`src/models/lstm/train.py::_fit_lstm()`), which monitors training loss with a patience of ten epochs and restores the best-observed weights; this reduces overfitting during a single training run but is not a hyperparameter search, since it does not compare different architectures or settings against each other.
+
+Each hybrid model (§3.7.2) reuses its residual model's hyperparameters unchanged from Table 3.3b — for example, the hybrid XGBoost-SARIMAX model's residual corrector uses the same XGBoost settings as the plain XGBoost model — so no additional hyperparameters were introduced for the hybrid combination step itself.
 
 ### 3.8.3 Forecasting Procedure
 
@@ -257,7 +307,7 @@ The evaluation also included actual-versus-predicted plots, residual analysis, a
 
 ## 3.10 Model Comparison and Selection
 
-All seven model families were compared on the same final holdout period. The comparison was carried out separately for carrot, brinjal, pumpkin, cabbage, snake gourd, and leeks. This avoided selecting one model only because it performed well for a different vegetable.
+All nine model families were compared on the same final holdout period. The comparison was carried out separately for carrot, brinjal, pumpkin, cabbage, snake gourd, and leeks. This avoided selecting one model only because it performed well for a different vegetable.
 
 The model with the lowest holdout RMSE was selected as the main forecasting model for each vegetable. MAE, MAPE, R², interval coverage, and visual forecast behaviour were examined as supporting evidence. This combined approach reduced the risk of selecting a model from one performance number without checking its practical behaviour.
 

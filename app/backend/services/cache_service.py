@@ -25,8 +25,10 @@ def prediction_key(vegetable: str, model: str) -> str:
     return f"{PREFIX}:predictions:{vegetable}:{model}"
 
 
-def future_predictions_key(vegetable: str, model: str) -> str:
-    return f"{PREFIX}:predictions:future:{vegetable}:{model}"
+def future_predictions_key(
+    vegetable: str, model: str, start_date: date | None = None, end_date: date | None = None
+) -> str:
+    return f"{PREFIX}:predictions:future:{vegetable}:{model}:{start_date}:{end_date}"
 
 
 def predictions_list_key(

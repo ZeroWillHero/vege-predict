@@ -2,10 +2,19 @@
 and historical prices from Postgres (Redis-cached). See CLAUDE.md's "Backend API"
 section for architecture notes. Interactive docs at /docs (Swagger UI) and /redoc."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.backend.routers import auth, health, models, predictions, prices, users, vegetables
+from app.backend.seed_admin import seed_default_admin
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await seed_default_admin()
+    yield
 
 TAGS_METADATA = [
     {
@@ -60,6 +69,7 @@ app = FastAPI(
         "All read endpoints are cached in Redis for 7 days (matching the weekly retrain cadence)."
     ),
     openapi_tags=TAGS_METADATA,
+    lifespan=lifespan,
 )
 
 # Public read-only API, no cookies/auth to protect — allow any origin. allow_credentials must

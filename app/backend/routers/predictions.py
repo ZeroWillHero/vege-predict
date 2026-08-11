@@ -82,7 +82,8 @@ async def latest_prediction(
         "yet, or the resolved model family has no future rows, this returns an empty list rather "
         "than a 404 — the same 'missing data is an empty list, not an error' convention "
         "`GET /predictions` already uses. `model=best` (the default) resolves to the vegetable's "
-        "current lowest-holdout-RMSE family, same as `GET /predictions/{vegetable}`."
+        "current lowest-holdout-RMSE family, same as `GET /predictions/{vegetable}`. "
+        "`start_date`/`end_date` optionally narrow the returned weeks to a specific range."
     ),
     response_description="Upcoming forecast rows, oldest first.",
     responses={
@@ -102,12 +103,18 @@ async def future_predictions(
         "this vegetable.",
         examples=["best"],
     ),
+    start_date: date | None = Query(
+        default=None, description="Only return future weeks on or after this date (inclusive).", examples=["2026-08-01"]
+    ),
+    end_date: date | None = Query(
+        default=None, description="Only return future weeks on or before this date (inclusive).", examples=["2026-09-30"]
+    ),
     session: AsyncSession = Depends(get_db),
 ):
     if vegetable not in VEGETABLES:
         raise HTTPException(status_code=404, detail=f"Unknown vegetable: {vegetable}")
 
-    key = future_predictions_key(vegetable, model)
+    key = future_predictions_key(vegetable, model, start_date, end_date)
     cached = await get_cached(key)
     if cached is not None:
         return cached
@@ -118,7 +125,7 @@ async def future_predictions(
         if model_family is None:
             raise HTTPException(status_code=404, detail=f"No model metrics for {vegetable}")
 
-    forecasts = await forecast_service.future_predictions(session, vegetable, model_family)
+    forecasts = await forecast_service.future_predictions(session, vegetable, model_family, start_date, end_date)
     result = [ForecastOut.model_validate(f).model_dump(mode="json") for f in forecasts]
     await set_cached(key, result)
     return result
@@ -133,7 +140,10 @@ async def future_predictions(
         "start/end date, newest first, paginated with `limit`/`offset`. Unlike `GET "
         "/predictions/{vegetable}`, an unknown `model` value here is not an error — it simply "
         "matches zero rows, so this endpoint can also be used to check whether a model family "
-        "produced any forecasts at all."
+        "produced any forecasts at all. If none of `year`/`start_date`/`end_date` are given, "
+        "results default to `forecast_date >= today` (today's forecast plus everything future) "
+        "rather than the full history — pass an explicit `start_date` (e.g. `2000-01-01`) to see "
+        "past forecasts too."
     ),
     response_description="Matching forecast rows, most recent first.",
     responses={404: {"description": "`vegetable` was given but is not one of the tracked vegetables."}},

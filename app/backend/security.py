@@ -27,7 +27,12 @@ def hash_password(plain: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return pwd_context.verify(plain, hashed)
+    except ValueError:
+        # bcrypt rejects secrets over 72 bytes with a ValueError rather than just failing the
+        # comparison - treat that the same as a wrong password instead of letting it 500.
+        return False
 
 
 def create_access_token(user: User) -> tuple[str, int]:
@@ -62,8 +67,12 @@ async def get_current_user(
     user_id = claims.get("sub")
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    user = await session.get(User, int(user_id))
+    user = await session.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or inactive user")
     return user

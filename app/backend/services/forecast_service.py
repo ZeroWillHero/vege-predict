@@ -41,19 +41,27 @@ async def latest_prediction(session: AsyncSession, vegetable: str, model_family:
     return result.scalar_one_or_none()
 
 
-async def future_predictions(session: AsyncSession, vegetable: str, model_family: str) -> list[Forecast]:
+async def future_predictions(
+    session: AsyncSession,
+    vegetable: str,
+    model_family: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[Forecast]:
     """Genuinely future, not-yet-resolved weeks only (actual_price IS NULL) — see
     scripts/predict_future.py. Chronological (oldest-first), since these are upcoming
-    weeks a caller wants to read in order, unlike list_predictions()'s newest-first history."""
-    stmt = (
-        select(Forecast)
-        .where(
-            Forecast.vegetable == vegetable,
-            Forecast.model_family == model_family,
-            Forecast.actual_price.is_(None),
-        )
-        .order_by(Forecast.forecast_date.asc())
+    weeks a caller wants to read in order, unlike list_predictions()'s newest-first history.
+    start_date/end_date optionally narrow this further, e.g. to a specific week range."""
+    stmt = select(Forecast).where(
+        Forecast.vegetable == vegetable,
+        Forecast.model_family == model_family,
+        Forecast.actual_price.is_(None),
     )
+    if start_date is not None:
+        stmt = stmt.where(Forecast.forecast_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(Forecast.forecast_date <= end_date)
+    stmt = stmt.order_by(Forecast.forecast_date.asc())
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -68,6 +76,9 @@ async def list_predictions(
     limit: int = 50,
     offset: int = 0,
 ) -> list[Forecast]:
+    if year is None and start_date is None and end_date is None:
+        start_date = date.today()
+
     stmt = select(Forecast)
     if vegetable is not None:
         stmt = stmt.where(Forecast.vegetable == vegetable)
